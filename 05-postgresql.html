@@ -1,0 +1,1166 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PostgreSQL · MERN Interview Prep</title>
+<link rel="stylesheet" href="assets/style.css?v=8">
+</head>
+<body>
+<script type="text/markdown" id="doc">
+# 5 · PostgreSQL & SQL
+
+The Kochi role lists **PostgreSQL as a must-have**. Expect **joins, GROUP BY, keys, indexes and transactions**, plus 1–2 live queries and probably "design the tables for our marketplace". You have a real PostgreSQL project (**Digital Classroom**), so answer with experience, not only theory.
+
+:::note
+**How to read each card:** ⚡ **Quick answer** first (say it in 10 seconds) → 📖 **Explanation** once → 🎤 **Interview answer** out loud, point by point → 🔷 **TypeScript angle** for the Kochi role. For SQL, **write the query on paper first**; saying it out loud isn't enough.
+:::
+
+## Basics
+
+### What is PostgreSQL? When would you choose it over MongoDB? {basic}
+
+:::quick
+**PostgreSQL is a relational database: tables with a fixed schema, linked by keys, queried with SQL, with ACID transactions. Choose it for structured, related data where correctness matters.**
+**Why it matters:** bookings and payments need constraints and transactions, so a marketplace is a natural PostgreSQL fit.
+:::
+
+**📖 Explanation**
+
+| Choose PostgreSQL when… | Choose MongoDB when… |
+|---|---|
+| Data is structured and relational (retreats → dates → bookings → payments) | Data is flexible or nested (profiles with varied fields) |
+| You need joins and complex reports | You mostly read whole documents |
+| Correctness rules matter: constraints, uniqueness, transactions | The schema changes often during early development |
+| Money, bookings, inventory | Content, catalogues, logs |
+
+:::say
+- **PostgreSQL** is a **relational database**: data lives in **tables with a defined schema**, linked by **primary and foreign keys**, with strong **ACID transactions**.
+- I chose it for **Digital Classroom** because the data is highly structured: **schools, classrooms, devices and usage events**.
+- There was a hard rule that **no record is ever duplicated**, and a **unique constraint plus transactions** enforce that **in the database itself**.
+- For VTMS's flexible teacher profiles, **MongoDB** fitted better.
+- So I **pick the database based on the shape of the data**; for a **booking marketplace**, I'd choose PostgreSQL.
+:::
+
+:::tip
+"Can PostgreSQL store JSON?" → "Yes, the `JSONB` type stores JSON in binary form and can be indexed with a GIN index, so Postgres can handle semi-structured data too."
+:::
+
+### What are primary, foreign, unique and composite keys? {basic}
+
+:::quick
+**Primary key = identifies each row. Foreign key = points to another table's row. Unique = no duplicates. Composite = a key made of several columns together.**
+**Why it matters:** keys let the database itself stop bad or duplicate data.
+:::
+
+**📖 Explanation**
+
+- **Primary key:** uniquely identifies each row; never null.
+- **Foreign key:** points to a primary key in another table; protects **referential integrity**.
+- **Unique key:** no duplicates in that column.
+- **Composite key:** a key made of **several columns** together.
+
+```sql
+CREATE TABLE classrooms (
+  id         SERIAL PRIMARY KEY,
+  school_id  INT NOT NULL REFERENCES schools(id) ON DELETE CASCADE,
+  code       TEXT NOT NULL UNIQUE                      -- e.g. 'SCH-023-CR-04'
+);
+CREATE TABLE usage_events (
+  device_id  TEXT NOT NULL,
+  seq_no     BIGINT NOT NULL,
+  app        TEXT NOT NULL,
+  started_at TIMESTAMPTZ NOT NULL,
+  ended_at   TIMESTAMPTZ,
+  PRIMARY KEY (device_id, seq_no)                     -- composite key
+);
+```
+
+:::say
+- A **primary key** uniquely identifies a row.
+- A **foreign key** references another table's primary key, so the database **won't allow a classroom pointing to a school that doesn't exist**.
+- A **unique constraint** prevents duplicates in a column, like a classroom code or an email.
+- A **composite key** uses **several columns together**.
+- In **Digital Classroom**, a usage event is identified by **device ID plus sequence number**, and that's exactly what makes **duplicate uploads impossible**.
+:::
+
+### What constraints do you use? {basic}
+
+:::quick
+**`NOT NULL`, `UNIQUE`, `CHECK`, `DEFAULT` and foreign keys with the right `ON DELETE` behaviour.**
+**Why it matters:** rules in the database protect data even when the API has a bug or someone runs a manual script.
+:::
+
+**📖 Explanation**
+
+| Constraint | Example |
+|---|---|
+| `NOT NULL` | every booking must have a guest |
+| `UNIQUE` | email, classroom code, payment ID |
+| `CHECK` | `CHECK (guests BETWEEN 1 AND 20)`, `CHECK (price >= 0)` |
+| `DEFAULT` | `created_at TIMESTAMPTZ DEFAULT now()` |
+| `FOREIGN KEY ... ON DELETE` | `CASCADE`, `SET NULL` or `RESTRICT` |
+
+:::say
+- I put **correctness rules in the database**, not only in code.
+- **`NOT NULL`** for required columns, **`UNIQUE`** for emails and codes, **`CHECK`** for valid ranges.
+- **`DEFAULT`** for timestamps, and **foreign keys** with the right delete behaviour.
+- Then even a **bug in the API** or a **manual script** can't insert invalid data.
+:::
+
+### What is normalization? Explain 1NF, 2NF and 3NF. {mid}
+
+:::quick
+**Normalization = split data into related tables so each fact is stored once. 1NF: one value per cell. 2NF: depends on the whole key. 3NF: depends only on the key.**
+**Why it matters:** no duplicated data means no "updated in one place, forgotten in another" bugs.
+:::
+
+**📖 Explanation**
+
+| Form | Rule | In plain words |
+|---|---|---|
+| **1NF** | Atomic values, no repeating groups | One value per cell, no "Yoga, Ayurveda" in one column |
+| **2NF** | 1NF + no partial dependency on part of a composite key | Every column depends on the **whole** key |
+| **3NF** | 2NF + no transitive dependency | Non-key columns depend **only on the key**, not on other columns |
+
+```mermaid
+flowchart LR
+  B["❌ classrooms(id, code, school_name, school_district)"] --> G["✅ schools(id, name, district)<br/>classrooms(id, code, school_id → schools)"]
+```
+
+:::say
+- **Normalization** splits data into related tables so **each fact is stored once**.
+- **1NF**: atomic values, one value per cell.
+- **2NF**: every column depends on the **whole** primary key.
+- **3NF**: non-key columns don't depend on **other non-key columns**.
+- Example: I don't store the school's name in every classroom row; classrooms just reference **`school_id`**, so renaming a school is **one update**.
+:::
+
+:::tip
+"When would you denormalize?" → "For read-heavy reports, I might store pre-computed daily totals, accepting some duplication for speed, as long as there's one clear source of truth."
+:::
+
+### Which data types matter most? (TIMESTAMPTZ, UUID, NUMERIC, JSONB…) {mid}
+
+:::quick
+**`TIMESTAMPTZ` for every time, `NUMERIC` (or integer paise) for money, never `FLOAT`. `UUID`/`BIGINT` for IDs, `JSONB` for flexible fields.**
+**Why it matters:** wrong time zones and float rounding on money are real production bugs.
+:::
+
+**📖 Explanation**
+
+| Type | Use |
+|---|---|
+| `TIMESTAMPTZ` | **Always** for event times: stored in UTC, time-zone aware |
+| `UUID` / `BIGINT GENERATED ALWAYS AS IDENTITY` | IDs |
+| `NUMERIC(10,2)` or `INTEGER` paise | Money (never `FLOAT`) |
+| `TEXT` / `VARCHAR(n)` | Strings (in Postgres, `TEXT` is just as fast) |
+| `JSONB` | Flexible extra fields, indexable |
+| `BOOLEAN`, `DATE`, `INTERVAL` | As named |
+| `ENUM` or `TEXT + CHECK` | Fixed status values |
+
+:::say
+- I use **`TIMESTAMPTZ`** for every event time, because it stores an **absolute moment in UTC**.
+- That matters when classrooms upload at **noon IST** and people review the data from other time zones.
+- **Money** goes in **`NUMERIC`** or **integer paise**, never float, to avoid **rounding errors**.
+- **`JSONB`** is great for **optional, flexible attributes** without losing indexing.
+:::
+
+:::ts
+**Gotcha with `pg`:** `NUMERIC`, `BIGINT` and `COUNT(*)` come back as **strings** in JavaScript (to avoid losing precision). So `rows[0].count` is `"42"`, not `42`. Convert with `Number()` (or cast in SQL: `COUNT(*)::int`) and type the row correctly.
+:::
+
+### How would you design the tables for a retreat marketplace? {mid}
+
+:::quick
+**Users (guest/host), retreats, retreat dates with capacity, bookings with status, payments, and reviews, linked by foreign keys with constraints.**
+**Why it matters:** "design our database" is a very likely founder-round question for this role.
+:::
+
+**📖 Explanation**
+
+```mermaid
+erDiagram
+  USERS ||--o{ RETREATS : hosts
+  USERS ||--o{ BOOKINGS : makes
+  RETREATS ||--o{ RETREAT_DATES : has
+  RETREAT_DATES ||--o{ BOOKINGS : for
+  BOOKINGS ||--o| PAYMENTS : paid_by
+  RETREATS ||--o{ REVIEWS : receives
+  USERS ||--o{ REVIEWS : writes
+```
+
+```sql
+CREATE TABLE users (
+  id          BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  email       TEXT NOT NULL UNIQUE,
+  role        TEXT NOT NULL CHECK (role IN ('guest', 'host', 'admin')),
+  created_at  TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE TABLE retreats (
+  id          BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  host_id     BIGINT NOT NULL REFERENCES users(id),
+  title       TEXT NOT NULL,
+  city        TEXT NOT NULL,
+  price_paise INTEGER NOT NULL CHECK (price_paise >= 0)
+);
+CREATE TABLE retreat_dates (
+  id          BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  retreat_id  BIGINT NOT NULL REFERENCES retreats(id) ON DELETE CASCADE,
+  starts_on   DATE NOT NULL,
+  ends_on     DATE NOT NULL CHECK (ends_on >= starts_on),
+  seats_left  INTEGER NOT NULL CHECK (seats_left >= 0)      -- can never go negative
+);
+CREATE TABLE bookings (
+  id          BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  date_id     BIGINT NOT NULL REFERENCES retreat_dates(id),
+  guest_id    BIGINT NOT NULL REFERENCES users(id),
+  guests      INTEGER NOT NULL CHECK (guests BETWEEN 1 AND 20),
+  status      TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'confirmed', 'cancelled')),
+  created_at  TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE TABLE payments (
+  id                 BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  booking_id         BIGINT NOT NULL REFERENCES bookings(id),
+  gateway_payment_id TEXT NOT NULL UNIQUE,                    -- same payment can't be recorded twice
+  amount_paise       INTEGER NOT NULL,
+  status             TEXT NOT NULL
+);
+CREATE INDEX ON retreats (city);
+CREATE INDEX ON retreat_dates (retreat_id, starts_on);
+CREATE INDEX ON bookings (guest_id);
+```
+
+:::say
+- I'd **start with questions**: can a retreat run on several dates? Is payment upfront? Can guests cancel?
+- Core tables: **users** with a role, **retreats** owned by a host, **retreat_dates** with **seats left**, **bookings** with a **status**, **payments**, and **reviews**.
+- **Constraints** protect the rules: `CHECK (seats_left >= 0)` so it can't be overbooked, a **unique gateway payment ID** so a payment isn't recorded twice.
+- **Money in integer paise**, times in **`TIMESTAMPTZ`**.
+- **Indexes** on what the app filters by: **city**, **retreat + start date**, and **a guest's bookings**.
+:::
+
+## Writing queries
+
+### In what order does a SQL query actually run? {mid}
+
+:::quick
+**FROM/JOIN → WHERE → GROUP BY → HAVING → SELECT → DISTINCT → ORDER BY → LIMIT.**
+**Why it matters:** explains why a SELECT alias can't be used in WHERE but can in ORDER BY.
+:::
+
+**📖 Explanation**
+
+You **write** `SELECT … FROM … WHERE …`, but the database **runs** it in this order:
+
+```mermaid
+flowchart LR
+  F["1 · FROM / JOIN"] --> W["2 · WHERE"] --> G["3 · GROUP BY"] --> H["4 · HAVING"] --> S["5 · SELECT"] --> D["6 · DISTINCT"] --> O["7 · ORDER BY"] --> L["8 · LIMIT / OFFSET"]
+```
+
+:::say
+- Logically, SQL runs **FROM and JOINs first**, then **WHERE** filters rows.
+- **GROUP BY** makes groups, and **HAVING** filters the groups.
+- Then **SELECT** computes the output columns, then **ORDER BY** and **LIMIT**.
+- That's why you **can't use a SELECT alias in WHERE** (it doesn't exist yet), but you **can in ORDER BY**.
+:::
+
+### WHERE vs HAVING? {basic}
+
+:::quick
+**WHERE filters rows before grouping. HAVING filters groups after aggregation, so it can use SUM or COUNT.**
+**Why it matters:** filter as much as possible in WHERE first: fewer rows to group.
+:::
+
+**📖 Explanation**
+
+```sql
+-- Classrooms with more than 120 learning minutes today
+SELECT classroom_id, SUM(minutes) AS total
+FROM daily_usage
+WHERE day = CURRENT_DATE          -- filters ROWS, before grouping
+GROUP BY classroom_id
+HAVING SUM(minutes) > 120;        -- filters GROUPS, after aggregation
+```
+
+:::say
+- **WHERE** filters **individual rows before grouping**.
+- **HAVING** filters **groups after aggregation**, so it can use functions like **SUM or COUNT**.
+- For performance, I filter as much as possible in **WHERE first**, so fewer rows need grouping.
+:::
+
+### Explain the types of JOIN. {basic}
+
+:::quick
+**INNER = only matching rows. LEFT = all left rows, NULLs where no match. RIGHT = the opposite. FULL = everything. LEFT JOIN + `IS NULL` finds rows with no match.**
+**Why it matters:** the most-asked SQL topic; the anti-join pattern impresses interviewers.
+:::
+
+**📖 Explanation**
+
+```mermaid
+flowchart LR
+  I["INNER JOIN<br/>only matching rows in both"]
+  L["LEFT JOIN<br/>all left rows + matches<br/>(NULL if none)"]
+  R["RIGHT JOIN<br/>all right rows + matches"]
+  F["FULL JOIN<br/>all rows from both"]
+```
+
+```sql
+-- Every retreat with its bookings, including retreats with NO bookings yet
+SELECT r.title, b.id AS booking_id
+FROM retreats r
+LEFT JOIN retreat_dates d ON d.retreat_id = r.id
+LEFT JOIN bookings b      ON b.date_id = d.id;
+
+-- Classrooms that have never uploaded (the "anti-join")
+SELECT c.code FROM classrooms c
+LEFT JOIN usage_events e ON e.classroom_id = c.id
+WHERE e.classroom_id IS NULL;
+```
+
+| Join | Returns |
+|---|---|
+| `INNER` | Rows with a match in **both** tables |
+| `LEFT` | **All** rows from the left table, NULLs where there's no match |
+| `RIGHT` | All rows from the right table |
+| `FULL OUTER` | All rows from both |
+| `CROSS` | Every combination |
+| Self join | A table joined to itself (employee → manager) |
+
+:::say
+- An **INNER JOIN** returns only rows that **match in both tables**.
+- A **LEFT JOIN** returns **every row from the left table**, with **NULLs** where the right side has no match.
+- That's perfect for "show **all** retreats, even those with **no bookings yet**".
+- Adding **`WHERE right.id IS NULL`** to a LEFT JOIN finds rows with **no match**, the **anti-join**.
+- In Digital Classroom, that's the report of **classrooms that have never uploaded**.
+:::
+
+### GROUP BY with aggregates: COUNT, SUM, AVG {basic}
+
+:::quick
+**GROUP BY collapses rows into one row per group; COUNT, SUM and AVG calculate per group. Every selected column must be grouped or aggregated.**
+**Why it matters:** every dashboard and report is built on this.
+:::
+
+**📖 Explanation**
+
+```sql
+-- Bookings and revenue per retreat this month, best first
+SELECT r.title,
+       COUNT(b.id)                 AS bookings,
+       SUM(p.amount_paise) / 100.0 AS revenue_rupees
+FROM retreats r
+JOIN retreat_dates d ON d.retreat_id = r.id
+JOIN bookings b      ON b.date_id = d.id AND b.status = 'confirmed'
+JOIN payments p      ON p.booking_id = b.id
+WHERE b.created_at >= date_trunc('month', now())
+GROUP BY r.id, r.title
+ORDER BY revenue_rupees DESC;
+```
+
+:::say
+- **GROUP BY** collapses rows into **one row per group**.
+- **Aggregate functions** like COUNT, SUM and AVG calculate values **per group**.
+- Every selected column must be **in the GROUP BY or inside an aggregate**.
+- A typical report: **confirmed bookings and revenue per retreat this month**, joining retreats, dates, bookings and payments.
+:::
+
+### Subquery vs CTE (WITH)? {mid}
+
+:::quick
+**A CTE (`WITH`) is a named temporary result used in the main query. Same job as a subquery, but much more readable for multi-step reports.**
+**Why it matters:** readable SQL is easier to review and debug.
+:::
+
+**📖 Explanation**
+
+```sql
+WITH today AS (
+  SELECT classroom_id, SUM(minutes) AS mins
+  FROM usage_events_daily WHERE day = CURRENT_DATE
+  GROUP BY classroom_id
+)
+SELECT c.code, COALESCE(t.mins, 0) AS mins
+FROM classrooms c LEFT JOIN today t ON t.classroom_id = c.id
+ORDER BY mins;
+```
+
+:::say
+- A **CTE**, the **`WITH`** clause, is a **named temporary result** I can reference in the main query.
+- It does the **same job as a subquery** but is **far more readable** for multi-step reports.
+- **Recursive CTEs** can walk hierarchies, like categories or an org chart.
+- For performance they're **usually the same** in modern Postgres.
+:::
+
+### What are window functions? {adv}
+
+:::quick
+**They calculate over related rows without collapsing them (unlike GROUP BY): rankings, running totals, previous/next values.**
+**Why it matters:** the clean answer to "top N per group" questions.
+:::
+
+**📖 Explanation**
+
+```sql
+-- Rank retreats by bookings within each city
+SELECT city, title, bookings,
+       RANK() OVER (PARTITION BY city ORDER BY bookings DESC) AS rank_in_city
+FROM retreat_stats;
+
+-- Running total and change vs previous day
+SELECT day, minutes,
+       SUM(minutes) OVER (ORDER BY day) AS running_total,
+       minutes - LAG(minutes) OVER (ORDER BY day) AS change_from_yesterday
+FROM classroom_daily WHERE classroom_id = 4;
+```
+
+| Function | Does |
+|---|---|
+| `ROW_NUMBER()` | 1, 2, 3… (unique) |
+| `RANK()` | Ties share a rank, then gaps (1, 1, 3) |
+| `DENSE_RANK()` | Ties share a rank, no gaps (1, 1, 2) |
+| `LAG()` / `LEAD()` | Previous / next row's value |
+| `SUM() OVER` | Running totals |
+
+:::say
+- **Window functions** compute values over a **set of related rows** while **keeping every row** in the result, unlike GROUP BY.
+- **`PARTITION BY`** defines the groups; **`ORDER BY` inside `OVER`** defines the order.
+- I'd use **`RANK`** to rank retreats within each city, **`LAG`** to compare with the previous day, and **`SUM() OVER`** for running totals.
+- They're the clean answer to **"top N per group"**.
+:::
+
+### How do you handle NULLs? {basic}
+
+:::quick
+**NULL means unknown: use `IS NULL`, never `= NULL`. `COALESCE` gives a default; `NULLIF` avoids division by zero.**
+**Why it matters:** "missing" and "zero" are different things in reports.
+:::
+
+**📖 Explanation**
+
+```sql
+SELECT COALESCE(mins, 0)      -- default when NULL
+WHERE ended_at IS NULL        -- never "= NULL" (it's always unknown)
+NULLIF(total, 0)              -- avoid divide-by-zero: x / NULLIF(total, 0)
+```
+
+:::say
+- **NULL** means **unknown**, so **`= NULL` never matches**; I use **`IS NULL`** or **`IS NOT NULL`**.
+- **`COALESCE`** gives a default, and **`NULLIF`** avoids **division by zero**.
+- In reports I'm careful: in **Digital Classroom**, a missing upload must show as **"awaiting data"**, not be turned into zero.
+- So I only use **`COALESCE(…, 0)`** where zero is **genuinely correct**.
+:::
+
+### UNION vs UNION ALL? {basic}
+
+:::quick
+**Both stack results from two queries. UNION removes duplicates (slower); UNION ALL keeps everything (faster).**
+**Why it matters:** use UNION ALL unless you really need deduplication.
+:::
+
+:::say
+- Both **stack results** from two queries with the **same columns**.
+- **UNION** removes duplicates, which costs a **sort or hash**.
+- **UNION ALL** keeps everything and is **faster**.
+- I use **UNION ALL** unless I really need deduplication.
+:::
+
+### How would you build search for retreats? (ILIKE, full-text) {mid}
+
+:::quick
+**Simple: `ILIKE '%yoga%'` (speed it up with a `pg_trgm` index). Better: full-text search with `tsvector` + a GIN index, which handles word forms and ranking.**
+**Why it matters:** search is a core marketplace feature, and `LIKE '%…'` can't use a normal index.
+:::
+
+**📖 Explanation**
+
+```sql
+-- 1. Simple, case-insensitive
+SELECT id, title FROM retreats WHERE title ILIKE '%' || $1 || '%';
+CREATE EXTENSION IF NOT EXISTS pg_trgm;
+CREATE INDEX retreats_title_trgm ON retreats USING GIN (title gin_trgm_ops);   -- makes ILIKE fast
+
+-- 2. Full-text search with ranking
+ALTER TABLE retreats ADD COLUMN search tsvector
+  GENERATED ALWAYS AS (to_tsvector('english', title || ' ' || coalesce(description, ''))) STORED;
+CREATE INDEX retreats_search_idx ON retreats USING GIN (search);
+
+SELECT id, title, ts_rank(search, q) AS rank
+FROM retreats, plainto_tsquery('english', $1) q
+WHERE search @@ q
+ORDER BY rank DESC LIMIT 20;
+```
+
+:::say
+- For a **simple search**, I'd use **`ILIKE`** with the search term as a **parameter**.
+- A normal index can't help a **leading wildcard**, so I'd add a **`pg_trgm` GIN index** to make it fast.
+- For **better search**, Postgres has **full-text search**: a **`tsvector`** column with a **GIN index**, matching word forms like "meditate" and "meditation", with **ranking**.
+- On the frontend I'd **debounce** the search box, so we don't query on every keystroke.
+- Only if search grows complex would I consider a separate engine like **Elasticsearch or Meilisearch**.
+:::
+
+## Indexes & performance
+
+### How do indexes work in PostgreSQL? Which types are there? {mid}
+
+:::quick
+**An index is a sorted lookup structure (B-tree by default) that lets Postgres find rows without scanning the whole table. It speeds reads but slightly slows writes.**
+**Why it matters:** the right index is the biggest single performance win in most apps.
+:::
+
+**📖 Explanation**
+
+**Analogy:** the index at the back of a book. Instead of reading every page, you jump straight to the right one.
+
+| Index | Best for |
+|---|---|
+| **B-tree** (default) | `=`, `<`, `>`, `BETWEEN`, `ORDER BY` |
+| **Composite** `(a, b)` | Filters on `a`, or `a` + `b` (leftmost prefix rule) |
+| **Unique** | Enforce uniqueness and speed lookups |
+| **Partial** | `WHERE status = 'active'` subset only |
+| **GIN** | `JSONB`, arrays, full-text search |
+| **BRIN** | Huge, naturally ordered tables (time-series) |
+
+```sql
+CREATE INDEX idx_events_classroom_time ON usage_events (classroom_id, started_at);
+CREATE INDEX idx_devices_active ON devices (classroom_id) WHERE revoked_at IS NULL;
+```
+
+:::say
+- Postgres uses **B-tree indexes** by default, which handle **equality, ranges and sorting**.
+- For "events for classroom 4 this week", a **composite index** on **classroom ID and start time** lets it jump straight to those rows, in order.
+- **Partial indexes** cover only active rows, **GIN** handles JSONB, arrays and search, and **BRIN** suits huge time-ordered tables.
+- Every index **slows writes slightly**, so I only add ones **real queries use**.
+:::
+
+### When is an index NOT used? {adv}
+
+:::quick
+**When the query skips the index's first column, wraps the column in a function, uses a leading wildcard, matches most of the table, or mismatches types.**
+**Why it matters:** "I added an index but it's still slow" is a classic follow-up.
+:::
+
+:::say
+- When the query **doesn't use the index's leading column**.
+- When a **function wraps the column**, like `WHERE LOWER(email) = …`, without an **expression index**.
+- With a **leading wildcard**, `LIKE '%abc'`.
+- When the table is **small** or the filter matches **most rows**, so a sequential scan is cheaper.
+- With **type mismatches**. I always confirm with **`EXPLAIN ANALYZE`**.
+:::
+
+### How do you use EXPLAIN ANALYZE? {mid}
+
+:::quick
+**`EXPLAIN` shows the plan; `EXPLAIN ANALYZE` runs the query and shows real timings. Look for Seq Scans on big tables and estimate-vs-actual gaps.**
+**Why it matters:** measure before you optimise.
+:::
+
+**📖 Explanation**
+
+```sql
+EXPLAIN ANALYZE
+SELECT * FROM usage_events WHERE classroom_id = 4 AND started_at >= now() - interval '7 days';
+-- Look for: Seq Scan (bad on big tables) vs Index Scan / Index Only Scan,
+--           estimated vs actual rows, and total execution time
+```
+
+:::say
+- **`EXPLAIN`** shows the plan Postgres **intends** to use.
+- **`EXPLAIN ANALYZE`** actually **runs** the query and shows **real timings and row counts**.
+- I look for **sequential scans on large tables**, big gaps between **estimated and actual rows** (stale statistics), and the **slowest node**.
+- Then I **add or fix an index**, **rewrite the query**, or run **`ANALYZE`** to refresh statistics.
+:::
+
+## Transactions & concurrency
+
+### What is ACID? {basic}
+
+:::quick
+**Atomicity (all or nothing), Consistency (constraints always hold), Isolation (concurrent transactions don't interfere), Durability (committed data survives crashes).**
+**Why it matters:** this is why bookings and payments belong in a relational database.
+:::
+
+**📖 Explanation**
+
+| Letter | Meaning | Example |
+|---|---|---|
+| **A**tomicity | All or nothing | Booking + seat update + payment record all save, or none do |
+| **C**onsistency | Constraints always hold | `seats_left` can never go below 0 |
+| **I**solation | Concurrent transactions don't interfere | Two guests booking at once don't corrupt the count |
+| **D**urability | Committed data survives crashes | Written to the write-ahead log (WAL) |
+
+:::say
+- **ACID** is the guarantee relational databases give for transactions.
+- **Atomicity**: all statements succeed or **none do**.
+- **Consistency**: **constraints are never violated**.
+- **Isolation**: concurrent transactions behave as if they ran **separately**, to a configurable level.
+- **Durability**: once committed, data **survives a crash**.
+- In **Digital Classroom**, each uploaded batch is saved in **one transaction**, so a crash halfway never leaves **half a batch**.
+:::
+
+### Transaction isolation levels and anomalies {adv}
+
+:::quick
+**Read Committed (Postgres default) → Repeatable Read → Serializable: more consistency, less concurrency. Read Committed + row locks or constraints is usually enough.**
+**Why it matters:** shows you understand concurrency, not just syntax.
+:::
+
+**📖 Explanation**
+
+| Level | Dirty read | Non-repeatable read | Phantom read |
+|---|---|---|---|
+| Read Uncommitted* | (prevented in Postgres) | possible | possible |
+| **Read Committed** (Postgres default) | ✅ prevented | possible | possible |
+| Repeatable Read | ✅ | ✅ | ✅ prevented in Postgres |
+| Serializable | ✅ | ✅ | ✅ + no serialization anomalies |
+
+- **Dirty read:** you see another transaction's uncommitted data.
+- **Non-repeatable read:** the same row gives a different value when read twice.
+- **Phantom read:** re-running a query returns new rows.
+
+:::say
+- Isolation levels **trade consistency for concurrency**.
+- Postgres defaults to **Read Committed**: you never see **uncommitted** data, but reading the same row twice might give **different values**.
+- **Repeatable Read** gives a **consistent snapshot** for the whole transaction.
+- **Serializable** makes transactions behave as if run **one by one**, retrying on conflict.
+- In practice, **Read Committed plus row locks or unique constraints** is usually enough.
+:::
+
+### How do you prevent race conditions, like double booking? {adv}
+
+:::quick
+**Make the database decide: lock the row with `SELECT … FOR UPDATE` in a transaction, or use one conditional `UPDATE … WHERE seats_left >= n`, or a unique constraint.**
+**Why it matters:** "check in code, then insert" lets two users book the last seat.
+:::
+
+**📖 Explanation**
+
+```sql
+-- Option 1: lock the row while deciding
+BEGIN;
+SELECT seats_left FROM retreat_dates WHERE id = 7 FOR UPDATE;   -- others wait here
+UPDATE retreat_dates SET seats_left = seats_left - 2 WHERE id = 7;
+INSERT INTO bookings (date_id, guest_id, guests) VALUES (7, 42, 2);
+COMMIT;
+
+-- Option 2: one atomic conditional update
+UPDATE retreat_dates SET seats_left = seats_left - 2
+WHERE id = 7 AND seats_left >= 2;      -- 0 rows updated = not enough seats → 409
+```
+
+:::say
+- A **race condition** happens when two requests **read the same value** and **both act on it**, like two guests booking the **last seat**.
+- I prevent it **in the database**.
+- Either **lock the row** with **`SELECT … FOR UPDATE`** inside a transaction, so the second request **waits**.
+- Or do a **single conditional update** that only succeeds while seats are available; **0 rows updated** means sold out.
+- **Constraints** are a third safety net: `CHECK (seats_left >= 0)` or a **unique constraint** makes the database reject the bad write.
+:::
+
+:::proj
+Full Node.js transaction code with `pg` is in [3 · Node: double booking](03-node-express.html#how-do-you-prevent-double-booking-race-conditions-in-an-api).
+:::
+
+### What is a deadlock? {adv}
+
+:::quick
+**Two transactions each hold a lock the other needs, so both wait forever. Postgres detects it and cancels one.**
+**Why it matters:** fix it with a consistent lock order, short transactions and a retry.
+:::
+
+:::say
+- A **deadlock** is when transaction A holds a lock **B needs**, while B holds a lock **A needs**, so both wait forever.
+- Postgres **detects it** and **cancels one** of them with an error.
+- I avoid deadlocks by **locking rows in a consistent order**, keeping **transactions short**.
+- And **retrying** the failed transaction in the application.
+:::
+
+### What is UPSERT (INSERT … ON CONFLICT)? {mid}
+
+:::quick
+**Insert a row, or do something else if it hits a unique constraint: `DO NOTHING` (ignore duplicates) or `DO UPDATE` (update the existing row).**
+**Why it matters:** your best real story: it's how Digital Classroom saves every record exactly once.
+:::
+
+**📖 Explanation**
+
+```sql
+-- Ignore duplicates (Digital Classroom uploads)
+INSERT INTO usage_events (device_id, seq_no, app, started_at, ended_at)
+VALUES ($1, $2, $3, $4, $5)
+ON CONFLICT (device_id, seq_no) DO NOTHING;
+
+-- Or update the existing row
+INSERT INTO daily_totals (classroom_id, day, minutes) VALUES ($1, $2, $3)
+ON CONFLICT (classroom_id, day) DO UPDATE SET minutes = EXCLUDED.minutes;
+```
+
+:::say
+- **UPSERT** inserts a row, or does something else if it **conflicts with a unique constraint**.
+- **`ON CONFLICT DO NOTHING`** simply **ignores duplicates**.
+- That's the heart of **Digital Classroom's "exactly once"** guarantee: a device can **safely resend** a batch, and repeated records are **skipped atomically**.
+- **`DO UPDATE`** with **`EXCLUDED`** updates the existing row instead, which suits **recalculated daily totals**.
+- The same idea makes **payment webhooks** safe: a unique payment ID means a retry can't record it twice.
+:::
+
+:::proj
+Your best SQL story. See Doc 9 → "How did you guarantee every record is saved exactly once?"
+:::
+
+## PostgreSQL with Node.js
+
+### How do you connect from Node, and prevent SQL injection? {mid}
+
+:::quick
+**Use the `pg` library with a connection pool, and always parameterized queries (`$1`, `$2`), never string concatenation.**
+**Why it matters:** SQL injection is one of the most common and damaging security bugs.
+:::
+
+**📖 Explanation**
+
+```js
+const { Pool } = require("pg");
+const pool = new Pool({ connectionString: process.env.DATABASE_URL, max: 10 });
+
+// ❌ SQL injection risk
+await pool.query(`SELECT * FROM users WHERE email = '${req.body.email}'`);
+// ✅ Parameterized query
+await pool.query("SELECT * FROM users WHERE email = $1", [req.body.email]);
+```
+
+:::say
+- I use the **`pg`** library with a **connection pool**, because opening a new connection per request is **slow**.
+- I always use **parameterized queries** with **`$1`, `$2`** placeholders.
+- The values are sent **separately from the SQL**, so user input can **never change the query**, which prevents **SQL injection**.
+- With **serverless Postgres like Neon**, I use its **pooled connection string**, so many app instances don't exhaust connections.
+:::
+
+:::ts
+`pool.query<UserRow>("SELECT id, email FROM users WHERE id = $1", [id])` types `rows` as `UserRow[]`. That type is **your promise**, not a check, so keep it in sync with the table (or let Prisma/Drizzle generate it). See [1b · TypeScript with PostgreSQL](01b-typescript.html#how-do-you-use-typescript-with-postgresql).
+:::
+
+### Transactions in Node.js with pg {mid}
+
+:::quick
+**Take one client from the pool → `BEGIN` → queries → `COMMIT`; on error `ROLLBACK`; always `release()` in `finally`.**
+**Why it matters:** forgetting `release()` slowly drains the pool until the app hangs.
+:::
+
+**📖 Explanation**
+
+```js
+const client = await pool.connect();
+try {
+  await client.query("BEGIN");
+  for (const r of batch) await client.query(INSERT_EVENT_SQL, [r.deviceId, r.seq, r.app, r.start, r.end]);
+  await client.query("COMMIT");
+} catch (err) {
+  await client.query("ROLLBACK");
+  throw err;
+} finally {
+  client.release();     // always return the connection to the pool
+}
+```
+
+:::say
+- For a transaction, I take **one client** from the pool, because all statements must use the **same connection**.
+- **`BEGIN`**, run the statements, then **`COMMIT`**; on any error, **`ROLLBACK`**.
+- The **`finally`** block always **releases** the client, otherwise the pool slowly **runs out of connections**.
+- For large batches I'd insert **many rows in one statement** instead of looping.
+:::
+
+:::ts
+A small typed helper keeps this safe everywhere:
+```ts
+async function withTransaction<T>(fn: (c: PoolClient) => Promise<T>): Promise<T> {
+  const c = await pool.connect();
+  try { await c.query("BEGIN"); const r = await fn(c); await c.query("COMMIT"); return r; }
+  catch (e) { await c.query("ROLLBACK"); throw e; }
+  finally { c.release(); }
+}
+```
+:::
+
+### Raw SQL vs ORM / query builder (Prisma, Drizzle, Knex)? {mid}
+
+:::quick
+**ORM (Prisma, Sequelize): typed models, migrations, less boilerplate. Query builder (Knex, Kysely, Drizzle): SQL-like with safety. Raw SQL: full control for complex reports.**
+**Why it matters:** many teams use an ORM for CRUD and raw SQL for heavy reports.
+:::
+
+**📖 Explanation**
+
+| Option | Strength | Watch out for |
+|---|---|---|
+| **Prisma** | Types generated from the schema, great developer experience, migrations | Complex queries may need raw SQL |
+| **Drizzle / Kysely** | TypeScript-first, SQL-like, typed | Newer, smaller ecosystem |
+| **Knex** | Flexible query builder, migrations | Weaker types |
+| **Raw `pg`** | Full control, best for reports | You write the types and the SQL yourself |
+
+:::say
+- An **ORM like Prisma** gives **type-safe models, migrations and less boilerplate**, which speeds up CRUD work.
+- A **query builder** like **Drizzle, Kysely or Knex** sits in the middle: SQL-like, but composable.
+- **Raw SQL** gives **full control** and the best performance for **complex reports**.
+- Many teams **combine them**: an ORM for everyday CRUD, raw SQL for heavy reports.
+- Whatever I use, queries must be **parameterized**, and I **check the generated SQL** for performance.
+:::
+
+:::ts
+In a TypeScript team, **Prisma** or **Drizzle** are popular because the database schema becomes TypeScript types automatically: rename a column and every query that uses it gets a compile error.
+:::
+
+### How do you manage schema changes (migrations)? {mid}
+
+:::quick
+**Versioned migration files in Git, applied automatically on deploy; never edit production by hand. Make changes backward-compatible in steps.**
+**Why it matters:** a startup's schema changes every week; mistakes here take the site down.
+:::
+
+:::say
+- Schema changes go through **versioned migration files**, using tools like **Prisma Migrate, Drizzle Kit or node-pg-migrate**.
+- They're **committed to Git** and **applied automatically on deploy**, never by editing production by hand.
+- For live systems I make changes **backward-compatible**.
+- Example: **add a nullable column** first, deploy code that writes it, **backfill** old rows, then make it **required**.
+:::
+
+## SQL practice (write the query)
+
+These use a small Digital Classroom-style database:
+
+```text
+schools(id, name, district)
+classrooms(id, school_id, code)
+daily_usage(classroom_id, day, minutes)        -- one row per classroom per day (if data arrived)
+employees(id, name, salary, manager_id)        -- for the classic questions
+```
+
+**Write your query on paper or in any SQL editor first**, then open the hints.
+
+### SQL 1: Find the second-highest salary {basic}
+
+:::hint
+Find the maximum salary that is less than the maximum salary.
+:::
+
+:::hint
+Or sort distinct salaries descending and skip one: `OFFSET 1`.
+:::
+
+:::solution
+```sql
+SELECT MAX(salary) FROM employees
+WHERE salary < (SELECT MAX(salary) FROM employees);
+
+-- or
+SELECT DISTINCT salary FROM employees ORDER BY salary DESC LIMIT 1 OFFSET 1;
+
+-- or (Nth highest, handles ties)
+SELECT salary FROM (
+  SELECT salary, DENSE_RANK() OVER (ORDER BY salary DESC) AS r FROM employees
+) t WHERE r = 2 LIMIT 1;
+```
+**Explain it:** the `DENSE_RANK` version generalises to "Nth highest", and handles duplicate salaries correctly.
+:::
+
+### SQL 2: Find duplicate classroom codes {basic}
+
+:::hint
+Group by the column, then filter groups with more than one row.
+:::
+
+:::solution
+```sql
+SELECT code, COUNT(*) AS times
+FROM classrooms
+GROUP BY code
+HAVING COUNT(*) > 1;
+```
+**Explain it:** `HAVING` filters after grouping. Then add a `UNIQUE` constraint so it can't happen again.
+:::
+
+### SQL 3: Classrooms that never uploaded any data {mid}
+
+:::hint
+You need every classroom, even those with no usage rows. Which join keeps all left rows?
+:::
+
+:::hint
+LEFT JOIN `daily_usage`, then keep only rows where the right side is NULL. (`NOT EXISTS` also works.)
+:::
+
+:::solution
+```sql
+SELECT c.code
+FROM classrooms c
+LEFT JOIN daily_usage u ON u.classroom_id = c.id
+WHERE u.classroom_id IS NULL;
+
+-- equivalent
+SELECT c.code FROM classrooms c
+WHERE NOT EXISTS (SELECT 1 FROM daily_usage u WHERE u.classroom_id = c.id);
+```
+**Explain it:** this is the "anti-join" pattern. It's a real report: boxes that need a field visit.
+:::
+
+### SQL 4: Total minutes per school, including schools with 0 {mid}
+
+:::hint
+Start FROM `schools`, then LEFT JOIN classrooms and usage, so schools without data still appear.
+:::
+
+:::hint
+`SUM` of no rows gives NULL, so wrap it in `COALESCE(…, 0)`.
+:::
+
+:::solution
+```sql
+SELECT s.name, COALESCE(SUM(u.minutes), 0) AS total_minutes
+FROM schools s
+LEFT JOIN classrooms c ON c.school_id = s.id
+LEFT JOIN daily_usage u ON u.classroom_id = c.id
+GROUP BY s.id, s.name
+ORDER BY total_minutes DESC;
+```
+**Explain it:** with INNER JOINs, schools without data would silently disappear from the report.
+:::
+
+### SQL 5: Top 2 classrooms by minutes in each school {adv}
+
+:::hint
+"Top N per group" is a window function problem: rank within each school.
+:::
+
+:::hint
+`ROW_NUMBER() OVER (PARTITION BY school_id ORDER BY total DESC)` in a CTE, then keep rank ≤ 2.
+:::
+
+:::solution
+```sql
+WITH totals AS (
+  SELECT c.school_id, c.code, SUM(u.minutes) AS total
+  FROM classrooms c JOIN daily_usage u ON u.classroom_id = c.id
+  GROUP BY c.school_id, c.code
+), ranked AS (
+  SELECT *, ROW_NUMBER() OVER (PARTITION BY school_id ORDER BY total DESC) AS rn
+  FROM totals
+)
+SELECT school_id, code, total FROM ranked WHERE rn <= 2;
+```
+**Explain it:** GROUP BY first, then a window function to rank within each school. Use `RANK` if ties should share a place.
+:::
+
+### SQL 6: Employees who earn more than their manager {mid}
+
+:::hint
+Join the `employees` table to itself: one copy for the employee, one for the manager.
+:::
+
+:::solution
+```sql
+SELECT e.name AS employee, m.name AS manager
+FROM employees e
+JOIN employees m ON m.id = e.manager_id
+WHERE e.salary > m.salary;
+```
+**Explain it:** a classic self join. Aliases `e` and `m` make two roles of the same table.
+:::
+
+### SQL 7: Days on which a classroom was "used" (more than 10 minutes), per month {mid}
+
+:::hint
+Filter rows with `minutes > 10`, then group by classroom and month with `date_trunc('month', day)`.
+:::
+
+:::solution
+```sql
+SELECT classroom_id,
+       date_trunc('month', day)::date AS month,
+       COUNT(*) AS used_days
+FROM daily_usage
+WHERE minutes > 10
+GROUP BY classroom_id, month
+ORDER BY classroom_id, month;
+```
+**Explain it:** this mirrors your real rule (more than 10 minutes means used). Days without a row are "awaiting data", not zero, so they're simply not counted as used.
+:::
+
+### SQL 8: Retreats with free seats in the next 30 days, cheapest first {mid}
+
+Uses the marketplace tables: `retreats(id, title, city, price_paise)` and `retreat_dates(id, retreat_id, starts_on, seats_left)`.
+
+:::hint
+Join retreats to their dates. Filter dates between today and 30 days ahead, with `seats_left > 0`.
+:::
+
+:::hint
+A retreat may have several such dates. Use `MIN(starts_on)` per retreat with GROUP BY, or `DISTINCT ON`.
+:::
+
+:::solution
+```sql
+SELECT r.id, r.title, r.city, r.price_paise / 100.0 AS price_rupees,
+       MIN(d.starts_on) AS next_date
+FROM retreats r
+JOIN retreat_dates d ON d.retreat_id = r.id
+WHERE d.starts_on BETWEEN CURRENT_DATE AND CURRENT_DATE + 30
+  AND d.seats_left > 0
+GROUP BY r.id
+ORDER BY r.price_paise, next_date;
+```
+**Explain it:** grouping by the primary key `r.id` lets you select the other `r` columns. A composite index on `retreat_dates (retreat_id, starts_on)` keeps it fast.
+:::
+
+### SQL 9: Each guest's total spend and number of confirmed bookings {mid}
+
+Tables: `users(id, email)`, `bookings(id, guest_id, status)`, `payments(booking_id, amount_paise)`.
+
+:::hint
+Join users → bookings (only `confirmed`) → payments, then group by user.
+:::
+
+:::hint
+To include guests with no confirmed bookings, start from `users` with LEFT JOINs, and put the status filter in the `ON` clause, not in `WHERE`.
+:::
+
+:::solution
+```sql
+SELECT u.email,
+       COUNT(b.id)                             AS confirmed_bookings,
+       COALESCE(SUM(p.amount_paise), 0) / 100.0 AS total_spent_rupees
+FROM users u
+LEFT JOIN bookings b ON b.guest_id = u.id AND b.status = 'confirmed'
+LEFT JOIN payments p ON p.booking_id = b.id
+GROUP BY u.id, u.email
+ORDER BY total_spent_rupees DESC;
+```
+**Explain it:** putting `status = 'confirmed'` in `WHERE` would turn the LEFT JOIN into an INNER JOIN and hide guests with no bookings. Putting it in `ON` keeps them, with 0.
+:::
+
+## Runnable practice (JavaScript)
+
+### Practice 1: Rank within groups (like RANK() OVER PARTITION BY) {adv}
+
+`rankWithin(rows, groupKey, valueKey)` adds `rank` to each row: 1 = highest value within its group. Ties share a rank, with gaps after (like SQL `RANK`).
+
+:::practice
+```js starter
+function rankWithin(rows, groupKey, valueKey) {
+  // your code here
+}
+```
+```js tests
+const rows = [
+  { school: "A", room: 1, mins: 90 }, { school: "A", room: 2, mins: 120 },
+  { school: "A", room: 3, mins: 90 }, { school: "B", room: 4, mins: 50 }];
+const out = rankWithin(rows, "school", "mins");
+const r = (room) => out.find((x) => x.room === room).rank;
+check([r(2), r(1), r(3)], [1, 2, 2], "ties share a rank within school A");
+check(r(4), 1, "school B ranked separately");
+check(out.length, 4, "keeps every row (not like GROUP BY)");
+```
+:::
+
+:::hint
+Group the rows by `groupKey` (a Map of arrays), and sort each group by value descending.
+:::
+
+:::hint
+For RANK: a row's rank = 1 + the number of rows in its group with a strictly greater value.
+:::
+
+:::solution
+```js
+function rankWithin(rows, groupKey, valueKey) {
+  const groups = new Map();
+  for (const r of rows) (groups.get(r[groupKey]) ?? groups.set(r[groupKey], []).get(r[groupKey])).push(r);
+  return rows.map((r) => ({
+    ...r,
+    rank: 1 + groups.get(r[groupKey]).filter((x) => x[valueKey] > r[valueKey]).length,
+  }));
+}
+```
+**Explain it:** "1 + count of strictly bigger values" is exactly SQL `RANK()`: ties get the same rank, and the next rank skips.
+:::
+
+### Practice 2: Simulate INSERT … ON CONFLICT DO NOTHING {mid}
+
+`insertBatch(table, batch)`: `table` is a `Map` keyed by `` `${deviceId}:${seq}` ``. Insert only new records and return how many were actually inserted. Sending the same batch twice must not create duplicates.
+
+:::practice
+```js starter
+function insertBatch(table, batch) {
+  // your code here
+}
+```
+```js tests
+const table = new Map();
+const batch = [{ deviceId: "D1", seq: 1, mins: 5 }, { deviceId: "D1", seq: 2, mins: 7 }];
+check(insertBatch(table, batch), 2, "first upload inserts 2");
+check(insertBatch(table, batch), 0, "retrying the same batch inserts nothing");
+check(insertBatch(table, [{ deviceId: "D1", seq: 2, mins: 7 }, { deviceId: "D1", seq: 3, mins: 4 }]), 1, "overlapping batch inserts only the new record");
+check(table.size, 3, "no duplicates stored");
+```
+:::
+
+:::hint
+Build the key from the two unique columns: `` `${r.deviceId}:${r.seq}` ``.
+:::
+
+:::hint
+If `table.has(key)`, skip it (DO NOTHING); otherwise `set` it and count it.
+:::
+
+:::solution
+```js
+function insertBatch(table, batch) {
+  let inserted = 0;
+  for (const r of batch) {
+    const key = `${r.deviceId}:${r.seq}`;
+    if (table.has(key)) continue;          // ON CONFLICT DO NOTHING
+    table.set(key, r);
+    inserted++;
+  }
+  return inserted;
+}
+```
+**Explain it:** this is idempotency. In the real database, the unique constraint on `(device_id, seq_no)` does this check **atomically**, so even two uploads at the same moment can't both insert the same record.
+:::
+
+### Practice 3: Book seats safely (conditional update) {mid}
+
+`bookSeats(dates, dateId, guests)`: `dates` is a `Map` of `id → { seatsLeft }`. Like `UPDATE … SET seats_left = seats_left - n WHERE id = $1 AND seats_left >= n`, reduce the seats and return `true` only if there were enough; otherwise change nothing and return `false`.
+
+:::practice
+```js starter
+function bookSeats(dates, dateId, guests) {
+  // your code here
+}
+```
+```js tests
+const dates = new Map([[1, { seatsLeft: 3 }]]);
+check(bookSeats(dates, 1, 2), true, "enough seats → booked");
+check(dates.get(1).seatsLeft, 1, "seats reduced");
+check(bookSeats(dates, 1, 2), false, "not enough seats → rejected");
+check(dates.get(1).seatsLeft, 1, "nothing changed on rejection");
+check(bookSeats(dates, 99, 1), false, "unknown date → rejected");
+```
+:::
+
+:::hint
+Get the row. If it doesn't exist, or `seatsLeft < guests`, return `false` (that's "0 rows updated").
+:::
+
+:::solution
+```js
+function bookSeats(dates, dateId, guests) {
+  const row = dates.get(dateId);
+  if (!row || row.seatsLeft < guests) return false;   // 0 rows updated → 409 Conflict
+  row.seatsLeft -= guests;
+  return true;
+}
+```
+**Explain it:** in JavaScript two requests could interleave between the check and the update. In SQL, the single `UPDATE … WHERE seats_left >= n` does the check and the change **atomically**, which is why the real logic belongs in the database.
+:::
+</script>
+<script src="assets/viewer.js?v=8"></script>
+</body>
+</html>

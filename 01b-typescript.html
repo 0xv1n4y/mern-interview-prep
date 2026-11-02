@@ -1,0 +1,1192 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>TypeScript · MERN Interview Prep</title>
+<link rel="stylesheet" href="assets/style.css?v=8">
+</head>
+<body>
+<script type="text/markdown" id="doc">
+# 1b · TypeScript ⭐
+
+The Kochi Full Stack role says **"TypeScript throughout"**: React + Node/Express + PostgreSQL. Expect TypeScript questions in **every** technical round, and expect them to be mixed with React and Node.
+
+:::note
+**The one idea behind every answer:** TypeScript = JavaScript + **types that are checked before the code runs**. The types are **removed** when it compiles, so they never exist at runtime. Data from outside (API requests, `fetch`, the database) must still be **validated at runtime**.
+:::
+
+:::warn
+**Be honest about your experience.** Say "about a year of TypeScript" and only name projects where you actually used it. If you used it less, say: *"I'm strongest in JavaScript and I use TypeScript in my newer work; I'm comfortable with types, generics, utility types and typing React and Express."* Interviewers trust honesty plus clear answers more than big claims.
+:::
+
+## Basics
+
+### What is TypeScript and why use it? {basic}
+
+:::quick
+**TypeScript is JavaScript with static types. It catches mistakes while you write code instead of when users hit them.**
+**Why it matters:** safer refactoring, better autocomplete, and the types act as documentation for the team.
+:::
+
+**📖 Explanation**
+
+```mermaid
+flowchart LR
+  A["app.ts<br/>(code + types)"] -->|"tsc checks types"| B{"Errors?"}
+  B -->|"yes"| C["❌ fix before running"]
+  B -->|"no"| D["app.js<br/>(types removed)"] --> E["runs in Node / browser"]
+```
+
+```ts
+function total(price: number, qty: number): number {
+  return price * qty;
+}
+total("100", 2); // ❌ compile error: string is not assignable to number
+```
+
+**Benefits:**
+- Bugs found **at compile time**, not in production
+- **Autocomplete** and safe **rename/refactor** in the editor
+- Types are **living documentation**: a new developer reads `User` and knows its shape
+- **Shared types** between React and Node keep the frontend and API in sync
+
+**Costs:** a build step, some learning curve, and types can become complex.
+
+:::say
+- TypeScript is a **superset of JavaScript** that adds **static types**.
+- The compiler **checks the types before the code runs**, then **removes them**, so the output is plain JavaScript.
+- It catches mistakes like **wrong argument types, typos in property names and missing null checks** while I'm typing.
+- It makes **refactoring safe** and gives great autocomplete.
+- In a team, the types work as **documentation**, and sharing types between the React app and the Node API keeps them **in sync**.
+:::
+
+:::tip
+- "Does TypeScript make code faster?" → No. It's removed at compile time; runtime speed is the same.
+- "Does TypeScript check data at runtime?" → No. Use runtime validation (like Zod) for API input.
+:::
+
+### What is the difference between type and interface? {basic}
+
+:::quick
+**Both describe object shapes. `interface` can be extended and merged; `type` can also describe unions, tuples and other types.**
+**Why it matters:** the most common TypeScript interview question. Pick one rule and be consistent.
+:::
+
+**📖 Explanation**
+
+```ts
+interface User { id: number; name: string; }
+interface Admin extends User { permissions: string[]; }   // extend with `extends`
+
+type Status = "active" | "blocked";                       // union: only `type` can do this
+type Point = [number, number];                            // tuple
+type AdminT = User & { permissions: string[] };           // extend with `&`
+```
+
+| | `interface` | `type` |
+|---|---|---|
+| Object shapes | ✅ | ✅ |
+| Unions, tuples, primitives | ❌ | ✅ |
+| Extend | `extends` | `&` (intersection) |
+| Declaration merging (same name twice) | ✅ merges | ❌ error |
+| Classes can `implements` | ✅ | ✅ (object types) |
+
+:::say
+- Both can describe the **shape of an object**.
+- **`interface`** supports **`extends`** and **declaration merging**: declaring it twice merges the two.
+- **`type`** is more flexible: it can describe **unions, tuples, primitives** and computed types.
+- My rule: **`interface` for object shapes** like props and API models, **`type` for unions** and utility combinations.
+- The important thing is being **consistent** across the codebase.
+:::
+
+:::tip
+"When do you *need* an interface?" → when extending a library type by declaration merging, for example adding `user` to Express's `Request`.
+:::
+
+### any vs unknown vs never? {mid}
+
+:::quick
+**`any` switches checking off. `unknown` means "could be anything, check it first". `never` means "this can't happen".**
+**Why it matters:** using `unknown` instead of `any` keeps the type safety for outside data.
+:::
+
+**📖 Explanation**
+
+```ts
+let a: any = "hi";
+a.toFixed();            // ✅ compiles, 💥 crashes at runtime
+
+let u: unknown = "hi";
+u.toUpperCase();        // ❌ compile error: must check first
+if (typeof u === "string") u.toUpperCase(); // ✅
+
+function fail(msg: string): never { throw new Error(msg); }  // never returns
+```
+
+| Type | Meaning | Use it for |
+|---|---|---|
+| `any` | No checking at all | Avoid. Only for quick migration |
+| `unknown` | Anything, but you must narrow it first | `JSON.parse` results, `catch` errors, API input |
+| `never` | A value that can't exist | Functions that always throw; exhaustive `switch` checks |
+| `void` | Function returns nothing useful | Event handlers, callbacks |
+
+:::say
+- **`any`** turns type checking **off**, so mistakes reach runtime. I avoid it.
+- **`unknown`** also accepts anything, but TypeScript **forces me to check the type** before using it. I use it for **API input, `JSON.parse` and errors in `catch`**.
+- **`never`** is a value that **can never happen**: a function that always throws, or the `default` branch of a `switch` that has handled every case.
+- So: **`unknown` is the safe version of `any`**.
+:::
+
+### What is type inference? When should you write types yourself? {basic}
+
+:::quick
+**TypeScript works out most types itself from the values. Write types for function parameters, return types of public functions, and empty starting values.**
+**Why it matters:** too many annotations add noise; too few leave `any` holes.
+:::
+
+**📖 Explanation**
+
+```ts
+let count = 0;                  // inferred: number
+const names = ["a", "b"];       // inferred: string[]
+const doubled = names.map(n => n.length); // inferred: number[]
+
+function add(a: number, b: number) { return a + b; } // return type inferred: number
+
+const [users, setUsers] = useState<User[]>([]);   // ✅ annotate: [] alone would be never[]
+let result: User | null = null;                    // ✅ annotate: null alone tells TS nothing
+```
+
+:::say
+- **Type inference** means TypeScript works out the type from the value, so I don't annotate everything.
+- I **always type function parameters**, because they can't be inferred.
+- I add **return types** on exported functions and API handlers, so a change can't silently alter the contract.
+- I annotate **empty starting values**, like `useState<User[]>([])` or a variable that starts as `null`.
+:::
+
+### What are union and intersection types? {basic}
+
+:::quick
+**Union `A | B` = one OR the other. Intersection `A & B` = both combined.**
+**Why it matters:** unions model real states like `"loading" | "success" | "error"`.
+:::
+
+**📖 Explanation**
+
+```ts
+type Id = string | number;                       // union: either
+type Status = "pending" | "paid" | "failed";     // union of literal values
+
+type Timestamps = { createdAt: Date; updatedAt: Date };
+type Booking = { id: number; guestName: string } & Timestamps; // intersection: all fields
+
+function printId(id: Id) {
+  if (typeof id === "string") console.log(id.toUpperCase()); // narrowed to string
+  else console.log(id.toFixed(0));                          // narrowed to number
+}
+```
+
+:::say
+- A **union** `A | B` means the value is **either** A **or** B; I must **narrow** it before using type-specific methods.
+- An **intersection** `A & B` **combines** both types: the value has **all** the properties.
+- I use unions for **fixed sets of values**, like a booking status, and intersections to **add shared fields**, like timestamps, to models.
+:::
+
+### What are literal types, enums and as const? {mid}
+
+:::quick
+**A literal type is an exact value (`"paid"`). Unions of literals or `as const` objects are usually preferred over `enum`.**
+**Why it matters:** they restrict a value to an allowed list, like a status, so typos are caught.
+:::
+
+**📖 Explanation**
+
+```ts
+// 1. Union of literals (simple, no runtime code)
+type Status = "pending" | "paid" | "failed";
+
+// 2. enum (generates a real JavaScript object)
+enum Role { Admin = "ADMIN", User = "USER" }
+
+// 3. as const object (runtime values + types, no enum quirks)
+const ROLES = { Admin: "ADMIN", User: "USER" } as const;
+type RoleT = typeof ROLES[keyof typeof ROLES];   // "ADMIN" | "USER"
+```
+
+:::say
+- A **literal type** is an exact value, like `"paid"`, and a **union of literals** restricts a value to an allowed list.
+- An **enum** does the same but also creates a **real object at runtime**.
+- I usually prefer **literal unions**, or an **`as const` object** when I also need the values at runtime, for example to fill a dropdown.
+- They're simpler and match what comes from the database or JSON, which are plain strings.
+:::
+
+### What is type narrowing? What are type guards? {mid}
+
+:::quick
+**Narrowing = TypeScript reduces a wide type to a specific one after a check (`typeof`, `instanceof`, `in`, `===`). A type guard is a function that does the check for you.**
+**Why it matters:** it's how you safely use unions and `unknown`.
+:::
+
+**📖 Explanation**
+
+```ts
+function format(value: string | number | Date) {
+  if (typeof value === "string") return value.trim();       // string
+  if (value instanceof Date) return value.toISOString();     // Date
+  return value.toFixed(2);                                   // number
+}
+
+// Custom type guard: the return type `x is User` tells TS what the check proves
+function isUser(x: unknown): x is User {
+  return typeof x === "object" && x !== null && "id" in x && "name" in x;
+}
+```
+
+| Check | Narrows |
+|---|---|
+| `typeof x === "string"` | primitives |
+| `x instanceof Date` | class instances |
+| `"email" in x` | objects with that property |
+| `x.kind === "card"` | discriminated unions |
+| `x !== null` / `if (x)` | removes `null` / `undefined` |
+
+:::say
+- **Narrowing** means TypeScript **reduces a union to a specific type** after a check.
+- The checks are **`typeof`** for primitives, **`instanceof`** for classes, **`in`** for properties, and comparing a **shared field**.
+- A **custom type guard** is a function returning **`x is User`**, so after calling it TypeScript knows the type.
+- I use it for **`unknown` data**, like a parsed JSON body.
+:::
+
+### What are discriminated unions? {mid}
+
+:::quick
+**A union of objects that all share one field (like `kind` or `status`), so a `switch` on that field gives the exact type in each branch.**
+**Why it matters:** the cleanest way to model API states and payment results without impossible combinations.
+:::
+
+**📖 Explanation**
+
+```ts
+type FetchState<T> =
+  | { status: "loading" }
+  | { status: "success"; data: T }
+  | { status: "error"; error: string };
+
+function render(state: FetchState<User[]>) {
+  switch (state.status) {
+    case "loading": return "Loading…";
+    case "success": return state.data.length + " users";   // data exists only here
+    case "error":   return state.error;                    // error exists only here
+    default: {
+      const _exhaustive: never = state;   // ❌ compile error if a new status is added and not handled
+      return _exhaustive;
+    }
+  }
+}
+```
+
+:::say
+- A **discriminated union** is a union of object types that share one **tag field**, like `status`.
+- When I `switch` on that field, TypeScript gives me the **exact type in each branch**.
+- It makes **impossible states impossible**: you can't have `data` while still `loading`.
+- With a **`never` check** in the `default` branch, adding a new status gives a **compile error** until I handle it.
+- I'd use this for **request states** in React and for **payment statuses**.
+:::
+
+### What do optional (?) and readonly mean? What is the non-null assertion (!)? {basic}
+
+:::quick
+**`?` = the property may be missing. `readonly` = can't be reassigned. `!` = "trust me, it's not null"; use it rarely.**
+**Why it matters:** `!` hides real bugs; interviewers like to hear you avoid it.
+:::
+
+**📖 Explanation**
+
+```ts
+interface Retreat {
+  readonly id: number;     // can't change after creation
+  title: string;
+  description?: string;    // string | undefined
+}
+
+const el = document.getElementById("root")!;   // ! removes null: crashes if it's actually missing
+const el2 = document.getElementById("root");
+if (el2) el2.textContent = "safe";              // ✅ better: check it
+```
+
+:::say
+- **`?`** makes a property **optional**, so its type includes `undefined`.
+- **`readonly`** stops **reassignment** after creation, at compile time.
+- The **`!` non-null assertion** tells TypeScript a value isn't `null`. It's **not checked at runtime**, so if I'm wrong it crashes.
+- I **prefer a real check** or optional chaining over `!`.
+:::
+
+### What is tsconfig.json? What does "strict" do? {mid}
+
+:::quick
+**`tsconfig.json` configures the compiler. `"strict": true` turns on all the important safety checks, like null checks and no implicit `any`.**
+**Why it matters:** TypeScript without `strict` misses most of the bugs it's meant to catch.
+:::
+
+**📖 Explanation**
+
+```json
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "NodeNext",
+    "strict": true,
+    "outDir": "dist",
+    "rootDir": "src",
+    "esModuleInterop": true,
+    "skipLibCheck": true
+  }
+}
+```
+
+| Setting | What it does |
+|---|---|
+| `strict` | Turns on `strictNullChecks`, `noImplicitAny`, `noImplicitThis` and more |
+| `target` | Which JavaScript version to output |
+| `module` / `moduleResolution` | CommonJS or ES modules; how imports are found |
+| `outDir` / `rootDir` | Where compiled files go / where source lives |
+| `noEmit` | Only type-check (Vite or tsx does the actual building) |
+
+:::say
+- `tsconfig.json` tells the compiler **how to check and build** the project.
+- The most important option is **`"strict": true`**.
+- It enables **`strictNullChecks`** (no surprise `null`) and **`noImplicitAny`** (every value must have a known type).
+- **`target`** and **`module`** decide what JavaScript is produced; **`outDir`** is where it goes.
+- In a Vite React project, TypeScript only **type-checks** (`noEmit`) and Vite does the building.
+:::
+
+## Generics & utility types
+
+### What are generics? {mid}
+
+:::quick
+**Generics are type parameters (`<T>`): write one function or type that works for many types while keeping the exact type.**
+**Why it matters:** used in every typed API helper, React `useState<T>` and reusable components.
+:::
+
+**📖 Explanation**
+
+**Analogy:** a generic is a box with a label slot. `Box<string>` holds strings, `Box<User>` holds users, with one definition.
+
+```ts
+// Without generics: we lose the type
+function firstAny(arr: any[]): any { return arr[0]; }
+
+// With a generic: the type flows through
+function first<T>(arr: T[]): T | undefined { return arr[0]; }
+const n = first([1, 2, 3]);        // number | undefined
+const u = first([{ name: "V" }]);  // { name: string } | undefined
+
+// A typed API response wrapper
+interface ApiResponse<T> { data: T; error?: string; }
+async function api<T>(url: string): Promise<ApiResponse<T>> {
+  const res = await fetch(url);
+  return res.json();
+}
+const res = await api<Retreat[]>("/api/retreats");   // res.data is Retreat[]
+```
+
+:::say
+- **Generics** are **type parameters**, written `<T>`.
+- They let me write **one function, type or component** that works with **many types** while **keeping the exact type**.
+- Example: `first<T>(arr: T[]): T` returns a number for a number array and a User for a User array.
+- I use them for a **typed API helper**, `api<T>(url)`, and for **`ApiResponse<T>`** wrappers.
+- React itself uses them: **`useState<User | null>(null)`**.
+:::
+
+### What are generic constraints (extends) and keyof? {adv}
+
+:::quick
+**`<T extends X>` limits T to types that have X's shape. `keyof T` gives the union of T's property names.**
+**Why it matters:** together they let you write safe helpers like `getProperty(obj, "name")`.
+:::
+
+**📖 Explanation**
+
+```ts
+// T must have an id
+function findById<T extends { id: number }>(items: T[], id: number): T | undefined {
+  return items.find(item => item.id === id);
+}
+
+// K must be a real key of T
+function getProperty<T, K extends keyof T>(obj: T, key: K): T[K] {
+  return obj[key];
+}
+const user = { id: 1, name: "Vinay" };
+getProperty(user, "name");   // string
+getProperty(user, "email");  // ❌ compile error: not a key of user
+
+// typeof on a value gives its type
+const config = { port: 3000, env: "dev" };
+type Config = typeof config;  // { port: number; env: string }
+```
+
+:::say
+- **`T extends X`** is a **constraint**: T can be any type, as long as it **has X's shape**.
+- **`keyof T`** is the **union of T's property names**, like `"id" | "name"`.
+- **`T[K]`** is the **type of that property**.
+- Together they let me write `getProperty(obj, key)`, where a **wrong key is a compile error** and the return type is exact.
+- **`typeof value`** turns an existing value into a type, so I don't repeat myself.
+:::
+
+### Which utility types do you use? (Partial, Pick, Omit, Record…) {mid}
+
+:::quick
+**Built-in helpers that create new types from existing ones: `Partial`, `Required`, `Pick`, `Omit`, `Record`, `Readonly`, `ReturnType`, `Awaited`.**
+**Why it matters:** one `User` type can produce the create, update and public versions without duplication.
+:::
+
+**📖 Explanation**
+
+```ts
+interface User { id: number; name: string; email: string; password: string; createdAt: Date; }
+
+type CreateUserDto = Omit<User, "id" | "createdAt">;  // what the client sends
+type UpdateUserDto = Partial<CreateUserDto>;          // PATCH: every field optional
+type PublicUser    = Omit<User, "password">;          // what the API returns
+type UserPreview   = Pick<User, "id" | "name">;       // for lists
+type UsersById     = Record<number, PublicUser>;      // lookup object
+```
+
+| Utility | Result |
+|---|---|
+| `Partial<T>` | all properties optional |
+| `Required<T>` | all properties required |
+| `Readonly<T>` | all properties read-only |
+| `Pick<T, K>` | only keys K |
+| `Omit<T, K>` | everything except keys K |
+| `Record<K, V>` | object with keys K and values V |
+| `ReturnType<F>` | what function F returns |
+| `Awaited<P>` | the value inside a Promise |
+| `NonNullable<T>` | removes `null` and `undefined` |
+
+:::say
+- Utility types **build new types from existing ones**, so I keep **one source of truth**.
+- **`Partial`** for **PATCH updates**, where every field is optional.
+- **`Omit`** to remove fields, like **`Omit<User, "password">`** for API responses.
+- **`Pick`** for small views, like a user preview in a list.
+- **`Record`** for lookup objects, and **`ReturnType`** / **`Awaited`** to reuse a function's result type.
+:::
+
+### What are mapped and conditional types? {adv}
+
+:::quick
+**Mapped types loop over keys to build a new type (`{ [K in keyof T]: … }`). Conditional types choose a type with `T extends X ? A : B`.**
+**Why it matters:** this is how `Partial` and friends are built; advanced, but good to explain.
+:::
+
+**📖 Explanation**
+
+```ts
+// Mapped: how Partial is written
+type MyPartial<T> = { [K in keyof T]?: T[K] };
+
+// Mapped: every field becomes a validation error message
+type FormErrors<T> = { [K in keyof T]?: string };
+
+// Conditional: unwrap an array
+type ElementOf<T> = T extends (infer U)[] ? U : T;
+type A = ElementOf<string[]>;  // string
+```
+
+:::say
+- A **mapped type** loops over the keys of a type to **build a new one**; `Partial` is literally `{ [K in keyof T]?: T[K] }`.
+- I've used it for **form errors**: `FormErrors<T>` gives an optional message per form field.
+- A **conditional type** picks a type with **`T extends X ? A : B`**, like a ternary for types.
+- **`infer`** pulls a type out, like the element type of an array.
+- In app code I mostly **use** these through utility types rather than writing complex ones.
+:::
+
+### What is type assertion (as)? How is it different from satisfies? {adv}
+
+:::quick
+**`as` overrides TypeScript ("trust me"); it doesn't check or convert anything. `satisfies` checks a value against a type but keeps the exact inferred type.**
+**Why it matters:** too much `as` hides bugs; `satisfies` is the safe modern option for config objects.
+:::
+
+**📖 Explanation**
+
+```ts
+const data = JSON.parse(body) as User;  // ⚠️ no check: if the body is wrong, TS still believes it
+
+const routes = {
+  home: "/",
+  retreat: "/retreats/:id",
+} satisfies Record<string, string>;     // ✅ checked, and routes.home stays the literal "/"
+```
+
+:::say
+- **`as`** is a **type assertion**: I tell TypeScript what the type is. It **doesn't check or convert** the value at runtime.
+- So `JSON.parse(body) as User` is **unsafe** if the data is wrong; I'd **validate** it instead.
+- **`satisfies`** **checks** that a value matches a type, but **keeps the more precise inferred type**.
+- I use `as` rarely, mostly for DOM elements, and `satisfies` for **config objects**.
+:::
+
+## TypeScript with React
+
+### How do you type props and children in React? {basic}
+
+:::quick
+**Describe props with an `interface`, use it in the function parameter, and use `React.ReactNode` for children.**
+**Why it matters:** the most common TypeScript + React task; wrong props become compile errors.
+:::
+
+**📖 Explanation**
+
+```tsx
+interface RetreatCardProps {
+  title: string;
+  price: number;
+  tags?: string[];                        // optional
+  onBook: (id: number) => void;           // function prop
+  children?: React.ReactNode;             // anything renderable
+}
+
+function RetreatCard({ title, price, tags = [], onBook, children }: RetreatCardProps) {
+  return (
+    <div>
+      <h3>{title}</h3><p>₹{price}</p>
+      {tags.map(t => <span key={t}>{t}</span>)}
+      <button onClick={() => onBook(1)}>Book</button>
+      {children}
+    </div>
+  );
+}
+```
+
+:::say
+- I describe props with an **`interface`** and **destructure** them in the function parameter.
+- **Optional props** get **`?`** and a **default value**.
+- Function props are typed by their **signature**, like `onBook: (id: number) => void`.
+- **`children`** is **`React.ReactNode`**, which covers text, elements and lists.
+- I avoid `React.FC` in new code, because a plain typed function is **simpler and clearer**.
+:::
+
+### How do you type useState, useRef and events? {mid}
+
+:::quick
+**`useState` infers from the starting value; add `<T>` when it starts empty or `null`. `useRef<HTMLInputElement>(null)` for DOM refs. Events use `React.ChangeEvent<…>` / `React.FormEvent`.**
+**Why it matters:** these three come up in every React + TypeScript coding round.
+:::
+
+**📖 Explanation**
+
+```tsx
+const [count, setCount] = useState(0);                     // inferred number
+const [user, setUser] = useState<User | null>(null);        // starts null
+const [items, setItems] = useState<Retreat[]>([]);          // starts empty
+
+const inputRef = useRef<HTMLInputElement>(null);            // DOM ref
+inputRef.current?.focus();
+
+function handleChange(e: React.ChangeEvent<HTMLInputElement>) {
+  setQuery(e.target.value);
+}
+function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
+  e.preventDefault();
+}
+```
+
+:::say
+- **`useState`** infers the type from the starting value; when it starts **`null` or `[]`**, I pass the type: **`useState<User | null>(null)`**.
+- **`useRef<HTMLInputElement>(null)`** for DOM elements, and I use **`?.`** because `current` can be `null`.
+- For events: **`React.ChangeEvent<HTMLInputElement>`** for inputs and **`React.FormEvent<HTMLFormElement>`** for forms.
+- Tip: hovering over `onChange` in the editor shows the **exact event type** to use.
+:::
+
+### How do you type a custom hook and Context? {mid}
+
+:::quick
+**Type the hook's return value (often a tuple `as const` or an object). For Context, type the value and throw if it's used outside its Provider.**
+**Why it matters:** shows you can build reusable, safe React code.
+:::
+
+**📖 Explanation**
+
+```tsx
+// Custom hook with a generic
+function useFetch<T>(url: string) {
+  const [data, setData] = useState<T | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    fetch(url, { signal: controller.signal })
+      .then(r => { if (!r.ok) throw new Error(`HTTP ${r.status}`); return r.json() as Promise<T>; })
+      .then(setData)
+      .catch(e => { if (e.name !== "AbortError") setError(e.message); })
+      .finally(() => setLoading(false));
+    return () => controller.abort();
+  }, [url]);
+
+  return { data, error, loading };
+}
+const { data } = useFetch<Retreat[]>("/api/retreats");   // data: Retreat[] | null
+
+// Typed context with a safe hook
+interface AuthCtx { user: User | null; login: (email: string, pw: string) => Promise<void>; }
+const AuthContext = createContext<AuthCtx | null>(null);
+function useAuth() {
+  const ctx = useContext(AuthContext);
+  if (!ctx) throw new Error("useAuth must be used inside AuthProvider");
+  return ctx;   // AuthCtx: no null checks needed everywhere else
+}
+```
+
+:::say
+- A **custom hook** is just a function, so I type its **parameters and return value**; a **generic** like `useFetch<T>` keeps the data type.
+- I include **loading and error states** and **abort** the request in the cleanup.
+- For **Context**, I type it as **`AuthCtx | null`** and write a **`useAuth()` hook that throws** if it's used outside the Provider.
+- That way, every component gets a **non-null, fully typed** context.
+:::
+
+### How do you make a generic React component? {adv}
+
+:::quick
+**Add a type parameter to the component: `function List<T>({ items, render }: ListProps<T>)`. TypeScript infers T from the `items` you pass.**
+**Why it matters:** reusable tables, lists and dropdowns that stay type-safe.
+:::
+
+**📖 Explanation**
+
+```tsx
+interface ListProps<T> {
+  items: T[];
+  getKey: (item: T) => string | number;
+  render: (item: T) => React.ReactNode;
+}
+
+function List<T>({ items, getKey, render }: ListProps<T>) {
+  return <ul>{items.map(item => <li key={getKey(item)}>{render(item)}</li>)}</ul>;
+}
+
+<List items={retreats} getKey={r => r.id} render={r => r.title} />  // r is Retreat
+```
+
+:::say
+- I add a **type parameter** to the component, like `List<T>`.
+- TypeScript **infers T** from the `items` prop, so `render` and `getKey` get the **correct item type** automatically.
+- One component then works for **retreats, users or bookings**, with full type safety.
+:::
+
+## TypeScript with Node, Express & PostgreSQL
+
+### How do you set up a Node + Express project with TypeScript? {basic}
+
+:::quick
+**Install `typescript`, `@types/node`, `@types/express`; add `tsconfig.json`; run with `tsx` in development and `tsc` to build to `dist/` for production.**
+**Why it matters:** "can you set it up yourself?" matters for a founding-team role.
+:::
+
+**📖 Explanation**
+
+```bash
+npm i express
+npm i -D typescript tsx @types/node @types/express
+npx tsc --init
+```
+
+```json
+"scripts": {
+  "dev": "tsx watch src/server.ts",
+  "build": "tsc",
+  "start": "node dist/server.js"
+}
+```
+
+**Folder structure:**
+
+```
+src/
+  server.ts          ← creates the app, starts listening
+  routes/            ← URL → controller
+  controllers/       ← read request, send response
+  services/          ← business logic (pure, testable)
+  db/                ← PostgreSQL pool and queries
+  types/             ← shared types
+  middleware/        ← auth, validation, errors
+```
+
+:::say
+- I install **`typescript`** plus the **type packages** `@types/node` and `@types/express`.
+- I create a **`tsconfig.json` with `strict` on**.
+- In development I run the code with **`tsx watch`**, which is fast and restarts on save.
+- For production I **compile with `tsc`** to `dist/` and run plain **`node dist/server.js`**.
+- I split the code into **routes, controllers, services and a db layer**, so the business logic is easy to test.
+:::
+
+:::tip
+"What are `@types` packages?" → type definitions (`.d.ts` files) for libraries written in plain JavaScript, maintained in DefinitelyTyped.
+:::
+
+### How do you type Express request and response? {mid}
+
+:::quick
+**`Request<Params, ResBody, ReqBody, Query>` and `Response<ResBody>` are generics. Type the body and params so the handler knows their shape.**
+**Why it matters:** shows you know Express's types beyond `req: any`.
+:::
+
+**📖 Explanation**
+
+```ts
+import { Request, Response, NextFunction } from "express";
+
+interface CreateBookingBody { retreatId: number; guests: number; }
+interface BookingParams { id: string; }   // URL params are always strings
+
+app.post("/bookings", async (req: Request<{}, Booking, CreateBookingBody>, res: Response<Booking>) => {
+  const { retreatId, guests } = req.body;   // typed
+  const booking = await bookingService.create(retreatId, guests);
+  res.status(201).json(booking);            // must be a Booking
+});
+
+app.get("/bookings/:id", async (req: Request<BookingParams>, res: Response) => {
+  const id = Number(req.params.id);         // convert: params are strings
+});
+```
+
+:::say
+- Express's `Request` and `Response` are **generics**: **`Request<Params, ResBody, ReqBody, Query>`**.
+- I type **`req.body`** and **`req.params`**, so the handler knows their exact shape.
+- **URL params are always strings**, so I convert them, for example with `Number(req.params.id)`.
+- Important: these types are **only a promise**, not a check. I still **validate `req.body` at runtime**, for example with **Zod**.
+:::
+
+### How do you add req.user in TypeScript (after auth middleware)? {adv}
+
+:::quick
+**Use declaration merging: extend Express's `Request` interface in a `.d.ts` file with `user?: …`.**
+**Why it matters:** every typed Express app with JWT auth needs this.
+:::
+
+**📖 Explanation**
+
+```ts
+// src/types/express.d.ts
+import "express";
+declare global {
+  namespace Express {
+    interface Request {
+      user?: { id: number; role: "admin" | "host" | "guest" };
+    }
+  }
+}
+
+// middleware/auth.ts
+export function requireAuth(req: Request, res: Response, next: NextFunction) {
+  const token = req.headers.authorization?.split(" ")[1];
+  if (!token) return res.status(401).json({ error: "Not logged in" });
+  req.user = jwt.verify(token, process.env.JWT_SECRET!) as Request["user"];
+  next();
+}
+```
+
+:::say
+- My auth middleware **verifies the JWT** and attaches the user to **`req.user`**.
+- By default TypeScript doesn't know `req.user` exists.
+- So I use **declaration merging**: in a **`.d.ts` file**, I extend Express's **`Request` interface** with a `user` property.
+- After that, **every route** sees `req.user` with the correct type.
+- This is one of the cases where **`interface`** is required, because only interfaces merge.
+:::
+
+### Compile-time types vs runtime validation: why do you need Zod? {mid}
+
+:::quick
+**TypeScript types disappear after compiling, so they can't check data that arrives at runtime. Zod checks the data AND gives you the TypeScript type from one schema.**
+**Why it matters:** the #1 sign that a candidate really understands TypeScript.
+:::
+
+**📖 Explanation**
+
+```ts
+import { z } from "zod";
+
+const CreateBookingSchema = z.object({
+  retreatId: z.number().int().positive(),
+  guests: z.number().int().min(1).max(20),
+  email: z.string().email(),
+});
+type CreateBooking = z.infer<typeof CreateBookingSchema>;   // type from the schema, no duplication
+
+// Reusable middleware
+const validate = (schema: z.ZodSchema) => (req: Request, res: Response, next: NextFunction) => {
+  const result = schema.safeParse(req.body);
+  if (!result.success) return res.status(400).json({ errors: result.error.flatten() });
+  req.body = result.data;
+  next();
+};
+app.post("/bookings", validate(CreateBookingSchema), createBooking);
+```
+
+```mermaid
+flowchart LR
+  C["Client sends JSON"] --> V{"Zod validate"}
+  V -->|"invalid"| E["400 + clear error"]
+  V -->|"valid"| H["Typed handler<br/>(safe to use)"] --> DB[("PostgreSQL")]
+```
+
+:::say
+- TypeScript types are **removed at compile time**, so they **can't check data at runtime**.
+- Anything from outside, like a **request body, query params, `fetch` responses or env variables**, could be wrong.
+- So I validate it with a **schema library like Zod**.
+- **One schema** gives me both the **runtime check** and the **TypeScript type** through `z.infer`, so they never get out of sync.
+- Invalid data gets a **clear 400 error** before it reaches the database.
+:::
+
+### How do you use TypeScript with PostgreSQL? {mid}
+
+:::quick
+**With the `pg` library, pass a row type: `pool.query<User>(sql, params)`. Or use a typed ORM / query builder like Prisma or Drizzle, which generate types from the schema.**
+**Why it matters:** the role's stack is TypeScript + PostgreSQL.
+:::
+
+**📖 Explanation**
+
+```ts
+import { Pool } from "pg";
+const pool = new Pool({ connectionString: process.env.DATABASE_URL });
+
+interface RetreatRow { id: number; title: string; price: number; city: string; }
+
+export async function getRetreatsByCity(city: string): Promise<RetreatRow[]> {
+  const { rows } = await pool.query<RetreatRow>(
+    "SELECT id, title, price, city FROM retreats WHERE city = $1 ORDER BY price",
+    [city]                       // parameterized: safe from SQL injection
+  );
+  return rows;
+}
+```
+
+| Option | How types work |
+|---|---|
+| `pg` (raw SQL) | You write the row interface yourself: `query<Row>()` |
+| **Prisma** | Generates types from `schema.prisma`; fully typed queries |
+| **Drizzle** | Schema written in TypeScript; SQL-like and typed |
+| Kysely | Typed SQL query builder |
+
+:::say
+- With the **`pg`** library I use a **connection pool** and **parameterized queries** (`$1`, `$2`) to prevent **SQL injection**.
+- I pass a **row type**, `pool.query<RetreatRow>()`, so the results are typed.
+- That type is **my promise**, so I keep it in sync with the table; ORMs like **Prisma or Drizzle** **generate types from the schema** automatically.
+- I've built a **Node.js + PostgreSQL API** in my Digital Classroom project, with **unique constraints and transactions** to store every record exactly once.
+:::
+
+:::proj
+Digital Classroom Monitoring: Node.js + PostgreSQL (Neon), parameterized inserts with `ON CONFLICT DO NOTHING` so retries never double-count. See Doc 5 and Doc 9.
+:::
+
+### How do you share types between the React frontend and the Node backend? {mid}
+
+:::quick
+**Put shared types (or Zod schemas) in one shared folder or package that both apps import. One change updates both sides.**
+**Why it matters:** "TypeScript throughout" is valuable mainly because of this.
+:::
+
+**📖 Explanation**
+
+```
+repo/
+  packages/shared/   ← types + Zod schemas (Booking, Retreat, API responses)
+  apps/web/          ← React (imports from shared)
+  apps/api/          ← Express (imports from shared)
+```
+
+```ts
+// packages/shared/booking.ts
+export const CreateBookingSchema = z.object({ retreatId: z.number(), guests: z.number() });
+export type CreateBooking = z.infer<typeof CreateBookingSchema>;
+// API validates with the schema; React form uses the same type (and can reuse the schema for form validation)
+```
+
+:::say
+- I keep **shared types and Zod schemas** in **one shared folder or package**, in a **monorepo**.
+- The **API validates** requests with the schema, and the **React app uses the same type** for forms and responses.
+- If a field changes, **both sides get a compile error** until they're updated.
+- That's the biggest benefit of **TypeScript throughout the stack**: the frontend and backend **can't drift apart**.
+:::
+
+### How would you migrate a JavaScript project to TypeScript? {mid}
+
+:::quick
+**Gradually: add `tsconfig` with `allowJs`, rename files one at a time (start with shared utilities and models), fix errors, then turn on `strict`.**
+**Why it matters:** startups often have JavaScript code to convert; shows practical thinking.
+:::
+
+**📖 Explanation**
+
+1. Add TypeScript and a `tsconfig.json` with **`allowJs: true`**, so `.js` and `.ts` files work together.
+2. Convert **leaf files first**: utilities, types and models, which everything else imports.
+3. Rename `.js` → `.ts` / `.tsx` **one module at a time**; fix errors; use `unknown` instead of `any` where unsure.
+4. Install **`@types/…`** for libraries.
+5. Turn on **`strict`** once most files are converted (or enable its checks one by one).
+6. Add **type-checking to CI** (`tsc --noEmit`) so no new errors get in.
+
+:::say
+- I'd migrate **gradually, never all at once**.
+- First, add `tsconfig` with **`allowJs`**, so JavaScript and TypeScript files can live together.
+- Then convert **shared code first**, like models and utilities, because everything imports them.
+- Convert **one module at a time**, keeping the app working; use **`unknown`** instead of `any` where unsure.
+- Finally, turn on **`strict`** and add **`tsc --noEmit` to CI**, so no new type errors get merged.
+:::
+
+## Quick-fire: spot the error
+
+Say what's wrong **before** opening the answer.
+
+### Spot it: a useState that starts empty {basic}
+
+```tsx
+const [users, setUsers] = useState([]);
+setUsers([{ id: 1, name: "V" }]);
+```
+
+:::quick
+**Error: `[]` is inferred as `never[]`, so nothing can be added.**
+**Fix:** `useState<User[]>([])`.
+:::
+
+### Spot it: an object that may be undefined {basic}
+
+```ts
+const user = users.find(u => u.id === 5);
+console.log(user.name);
+```
+
+:::quick
+**Error: `find` returns `User | undefined`, so `user` may be undefined.**
+**Fix:** `user?.name`, or `if (!user) return …` first.
+:::
+
+### Spot it: an unsafe error in catch {mid}
+
+```ts
+try { await save(); }
+catch (err) { console.log(err.message); }
+```
+
+:::quick
+**Error: with `strict`, `err` is `unknown`.**
+**Fix:** `if (err instanceof Error) console.log(err.message);`
+:::
+
+### Spot it: trusting JSON with as {mid}
+
+```ts
+const body = JSON.parse(raw) as Booking;
+await db.insert(body);
+```
+
+:::quick
+**Problem: it compiles, but nothing checks the data. Bad input goes straight to the database.**
+**Fix:** `const body = BookingSchema.parse(JSON.parse(raw));` (runtime validation with Zod).
+:::
+
+### Spot it: a URL param used as a number {basic}
+
+```ts
+app.get("/retreats/:id", (req, res) => {
+  const id: number = req.params.id;
+});
+```
+
+:::quick
+**Error: `req.params.id` is a `string`.**
+**Fix:** `const id = Number(req.params.id);` and return 400 if it's `NaN`.
+:::
+
+## The Kochi role: likely founder-round questions
+
+This role is a **small founding team** building a **wellness-retreat marketplace**. They want someone who can **own features end to end**, **ask the right questions** and **use AI tools well**. These answers use your real experience.
+
+### How would you build a feature end to end, for example "book a retreat"? {mid}
+
+:::quick
+**Clarify the need → design data and API → build backend with validation and tests → build the UI → deploy → check it with real use.**
+**Why it matters:** "own features end to end" is the main requirement of this job.
+:::
+
+**📖 Explanation**
+
+```mermaid
+flowchart LR
+  A["1 · Ask<br/>who books? payment? cancel?"] --> B["2 · Design<br/>tables + API + types"]
+  B --> C["3 · Backend<br/>Express + Zod + PostgreSQL<br/>+ tests"]
+  C --> D["4 · Frontend<br/>React form + states"]
+  D --> E["5 · Ship<br/>deploy + monitor"]
+  E --> F["6 · Learn<br/>feedback → next version"]
+```
+
+**Example design:**
+- Tables: `retreats`, `retreat_dates` (with `capacity`), `bookings` (`status`: pending / confirmed / cancelled).
+- API: `POST /bookings` (validated with Zod), `GET /bookings/:id`.
+- Overbooking protection: a **transaction** with a row lock (`SELECT … FOR UPDATE`) on the date's capacity.
+- UI: date picker, guest count, price summary, and loading / error / success states.
+
+:::say
+- I start by **asking questions**: who books, is payment upfront, what happens on cancellation, what's the **smallest version** we can launch?
+- Then I **design the data and API**: tables for retreats, dates with capacity and bookings, plus **shared TypeScript types**.
+- I build the **backend first**, with **Zod validation**, a **transaction** so two people can't book the last spot, and **tests**.
+- Then the **React UI**, with clear loading, error and success states.
+- I **deploy, watch real usage** and improve it. That's exactly how I took **Digital Classroom from idea to pilot in four weeks**.
+:::
+
+### How do you use AI tools in your development work? {basic}
+
+:::quick
+**AI writes and explains code fast; I own the decisions: requirements, design, review, testing and approval.**
+**Why it matters:** the job says AI tools are "a core part of your workflow". You have a real story.
+:::
+
+**📖 Explanation**
+
+Your real example: **Digital Classroom Monitoring** was built with AI writing much of the code, with you deciding, testing and approving.
+
+| My part | The AI's part |
+|---|---|
+| Decide what to build and why | Write code for the app, server and dashboard |
+| Write requirements in plain words | Write and run automated tests (80+) |
+| Test every release on a real device | Lay out options with trade-offs |
+| Check results against raw data | Explain unfamiliar code |
+| Approve every release | |
+
+:::say
+- I use AI tools like **Claude Code** as a **core part of my workflow**.
+- The AI **writes code and tests quickly** and lays out options with trade-offs.
+- **I own the decisions**: what to build, the requirements, the design and the final review.
+- I **test every release on real devices** and check results against raw data before approving.
+- With that approach I took **Digital Classroom Monitoring from idea to pilot in four weeks**, with **12 releases and 80+ automated tests**.
+- AI didn't remove the work; it **moved my work to deciding, reviewing and testing**.
+:::
+
+### Have you done payment integration? How would you build it? {mid}
+
+:::quick
+**Be honest: "Not in production yet." Then show you know the safe flow: create the order on the server, pay on the client, verify the signature on the server, and confirm with a webhook.**
+**Why it matters:** it's a "good to have"; a clear, honest answer still scores well.
+:::
+
+**📖 Explanation**
+
+Typical flow (Razorpay / Stripe are similar):
+
+```mermaid
+sequenceDiagram
+  participant U as React app
+  participant S as Express API
+  participant P as Payment gateway
+  U->>S: POST /payments/order (bookingId)
+  S->>S: read price from DB (never trust client price)
+  S->>P: create order (amount in paise)
+  P-->>S: orderId
+  S-->>U: orderId
+  U->>P: checkout popup (user pays)
+  P-->>U: paymentId + signature
+  U->>S: POST /payments/verify
+  S->>S: verify HMAC signature with secret
+  S->>S: booking → confirmed (transaction)
+  P-)S: webhook "payment.captured" (backup confirmation)
+```
+
+**Key rules:**
+- **Price comes from the server/database**, never from the client.
+- **Verify the signature** on the server with the secret key.
+- Handle the **webhook** too, in case the user closes the browser before the verify call.
+- Make it **idempotent**: the same payment confirmed twice must not double-book (unique constraint on `payment_id`).
+- Store money as **integers in paise**.
+
+:::say
+- **Honestly, I haven't integrated payments in production yet**, but I understand the safe flow.
+- The **server creates the order**, reading the **price from the database**, never from the client.
+- The client completes payment in the gateway's checkout, then the **server verifies the signature** with the secret key.
+- I'd also handle the **webhook** as a backup, and make confirmation **idempotent** with a unique constraint, so a retry can't double-book.
+- That's the same **"exactly once"** idea I used in Digital Classroom for usage records, so I'm confident I can pick it up quickly.
+:::
+
+### What testing have you done? {basic}
+
+:::quick
+**Unit tests for logic, API tests for routes, and real-device testing for releases. Digital Classroom has 80+ automated tests.**
+**Why it matters:** testing frameworks are a "good to have" in the job description.
+:::
+
+**📖 Explanation**
+
+| Level | Tool | What it checks |
+|---|---|---|
+| Unit | **Jest / Vitest** | Pure functions, like the "was the classroom used?" rules |
+| API / integration | **Supertest** | Express routes with a test database |
+| Component | **React Testing Library** | UI behaves as the user sees it |
+| End to end | Playwright / Cypress | Full flows in a browser |
+
+```ts
+// Supertest example
+it("rejects a booking with 0 guests", async () => {
+  const res = await request(app).post("/bookings").send({ retreatId: 1, guests: 0 });
+  expect(res.status).toBe(400);
+});
+```
+
+:::say
+- I test at a few levels: **unit tests** for business logic, **API tests** with Supertest for routes, and **component tests** for important UI.
+- Digital Classroom has **80+ automated tests**, and **every release was also tested on a real device** before going live.
+- I focus tests on **what's risky**: money, data correctness and permissions, rather than chasing 100% coverage.
+:::
+
+### What DevOps experience do you have? {basic}
+
+:::quick
+**Deployed full-stack apps myself: Render for the Node API, Neon for PostgreSQL, Vercel for React; environment variables, staged releases and monitoring.**
+**Why it matters:** a startup needs you to ship without a separate DevOps team.
+:::
+
+:::say
+- I've **deployed my own apps end to end**: Node APIs on **Render**, PostgreSQL on **Neon**, and React frontends on **Vercel**.
+- I manage **environment variables and secrets** properly, never in the code.
+- I keep **separate test and live databases**, so sample data never touches production.
+- I release in **small steps** and verify each one on real devices before the next.
+- I'm comfortable learning **Docker and CI pipelines** like GitHub Actions as the product grows.
+:::
+
+:::warn
+Only list tools you've actually used. If asked about Docker or AWS and you haven't used them in a project, say "I know the basics and I'm learning it", not "yes".
+:::
+
+### Why do you want to join an early-stage startup? {basic}
+
+:::quick
+**You like owning problems end to end, working close to users, and seeing your ideas shipped; that's what you've been doing at the Trust.**
+**Why it matters:** founders want people who enjoy ambiguity, not only tickets.
+:::
+
+:::say
+- At Swashodhan Trust I've worked like a **one-person product team**: I find the problem, design the solution, build it and support it.
+- I **enjoy that ownership**, and I want to keep doing it with a **strong founding team** where my ideas matter.
+- A marketplace for wellness retreats is a **real product with real users**, and building it from the early stage is exactly the experience I want.
+- I'm also **comfortable with ambiguity**: I'll ask questions, make trade-offs and ship working software.
+:::
+
+### What questions should you ask them at the end? {basic}
+
+:::quick
+**Ask about the product, the team and how success is measured. Never leave without asking at least two.**
+**Why it matters:** good questions show you think like an owner.
+:::
+
+- "What's the **biggest problem** the product needs to solve in the next 6 months?"
+- "Is there an **existing codebase**, or would I be building from the start? What's the current stack and hosting?"
+- "How do **you use AI tools** in the team today?"
+- "How big is the **tech team**, and who would I work with day to day?"
+- "What would **a great first 90 days** look like for this role?"
+- "The role says **Remote / Hybrid (Kochi)** and **Monday to Saturday**: how does that work in practice?"
+</script>
+<script src="assets/viewer.js?v=8"></script>
+</body>
+</html>

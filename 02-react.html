@@ -1,0 +1,1189 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>React · MERN Interview Prep</title>
+<link rel="stylesheet" href="assets/style.css?v=8">
+</head>
+<body>
+<script type="text/markdown" id="doc">
+# 2 · React
+
+React questions at 3+ years focus on **why things re-render, how hooks really work, and how you structure state**. Connect every answer to TaskFlow, VTMS or the Snowa dashboard.
+
+:::note
+**How to read each card:** ⚡ **Quick answer** first (say it in 10 seconds) → 📖 **Explanation** once → 🎤 **Interview answer** out loud, point by point → 🔷 **TypeScript angle** for the Kochi role. Full TypeScript + React details are in [1b · TypeScript](01b-typescript.html#typescript-with-react).
+:::
+
+## Core concepts
+
+### What is React, and why use it? {basic}
+
+:::quick
+**React is a JavaScript library for building UIs from reusable components. You describe the UI for the current state; React updates the screen.**
+**Why it matters:** declarative code is easier to build and maintain than changing the DOM by hand.
+:::
+
+**📖 Explanation**
+
+- **Component-based:** the UI is split into small, reusable pieces (`Navbar`, `RetreatCard`, `BookingForm`).
+- **Declarative:** you say *what* the UI should look like for a state; React works out *how* to update the page.
+- **One-way data flow:** data goes down through props; events go up through callbacks.
+
+:::say
+- React is a **library for building user interfaces** out of **reusable components**.
+- It's **declarative**: I describe what the UI should look like for the current state, and React updates the page when the state changes.
+- Data flows **one way**, parent to child, which makes bugs easier to trace.
+- That makes complex, interactive screens like **dashboards** much easier to build and maintain.
+- I've used it for all my frontends, including the **three-role VTMS dashboards**.
+:::
+
+### What is the Virtual DOM and reconciliation? {basic}
+
+:::quick
+**The Virtual DOM is a JavaScript copy of the UI. On a state change, React compares the new copy with the old one and updates only what changed in the real DOM.**
+**Why it matters:** real DOM updates are slow, so React keeps them to a minimum.
+:::
+
+**📖 Explanation**
+
+- **Virtual DOM:** a lightweight JavaScript copy of the UI tree.
+- **Reconciliation:** when state changes, React builds a new virtual tree, **compares (diffs)** it with the previous one, and updates **only what changed** in the real DOM.
+
+```mermaid
+flowchart LR
+  S["State changes"] --> N["New virtual tree"]
+  O["Previous virtual tree"] --> D{"Diff"}
+  N --> D
+  D --> P["Patch only the changed<br/>nodes in the real DOM"]
+```
+
+**Diffing rules:** a different element type replaces the whole subtree; the same type only updates attributes; lists are matched by **key**.
+
+:::say
+- The **Virtual DOM** is an **in-memory copy** of the UI.
+- When state changes, React builds a **new virtual tree** and **compares it** with the previous one.
+- It applies **only the minimum changes** to the real DOM, because real DOM updates are the slow part.
+- This process is called **reconciliation**, and **keys** help React match list items correctly.
+:::
+
+:::tip
+"Is the Virtual DOM always faster?" → "Not faster than perfect hand-written DOM code, but it gives good performance by default while letting us write declarative code."
+:::
+
+### What is JSX? {basic}
+
+:::quick
+**JSX is HTML-like syntax inside JavaScript. It compiles into function calls that create React elements.**
+**Why it matters:** it's not HTML: `className` instead of `class`, and `{ }` for any JavaScript expression.
+:::
+
+**📖 Explanation**
+
+```jsx
+const el = <h1 className="title">Hi {name}</h1>;
+// compiles to roughly:
+const el2 = jsx("h1", { className: "title", children: ["Hi ", name] });
+```
+
+:::say
+- **JSX** lets me write **HTML-like markup inside JavaScript**.
+- A compiler, like **Babel** or the one in **Vite**, turns it into **function calls** that create React elements.
+- It isn't HTML: I use **`className`** instead of `class` and **`htmlFor`** instead of `for`.
+- I can put **any JavaScript expression** inside curly braces.
+:::
+
+:::ts
+TypeScript files with JSX use the **`.tsx`** extension. TypeScript then checks every JSX attribute against the component's props: a missing or wrong prop is a compile error.
+:::
+
+### Props vs state? {basic}
+
+:::quick
+**Props = input from the parent, read-only. State = data the component owns and can change; changing it re-renders.**
+**Why it matters:** deciding where data lives is the core of React design.
+:::
+
+**📖 Explanation**
+
+| | Props | State |
+|---|---|---|
+| Comes from | Parent component | Inside the component |
+| Can the component change it? | ❌ read-only | ✅ with the setter |
+| Changing it causes | the parent to re-render the child | this component to re-render |
+
+:::say
+- **Props** are inputs **passed from a parent**; they're **read-only** inside the child.
+- **State** is data a component **owns and can change**; changing it **triggers a re-render**.
+- My rule: if a value can be **calculated from props or other state**, I don't store it in state; I **derive it during render**.
+:::
+
+:::ts
+Props get an `interface`: `function Card({ title, price }: CardProps)`. State infers its type from the starting value, or you pass one: `useState<User | null>(null)`.
+:::
+
+### Why are keys important in lists? Why not use the index? {basic}
+
+:::quick
+**Keys tell React which item is which between renders. Use a stable unique ID, not the array index.**
+**Why it matters:** with index keys, inserting or reordering items attaches state and input values to the wrong row.
+:::
+
+**📖 Explanation**
+
+```jsx
+{tasks.map((t) => <TaskRow key={t._id} task={t} />)}   // ✅ stable unique id
+{tasks.map((t, i) => <TaskRow key={i} task={t} />)}    // ⚠️ breaks when items reorder/insert
+```
+
+**Problem with the index:** insert an item at the top and every index shifts, so React reuses the wrong components. Input values, focus and state end up on the wrong item.
+
+:::say
+- **Keys** let React **identify list items** between renders, so it reuses the right DOM nodes and state.
+- I use a **stable unique ID**, like the database `id` or MongoDB `_id`.
+- The **array index is risky** when items can be **added, removed or reordered**: state and input values get attached to the wrong rows.
+- The index is only acceptable for a **static list** that never changes.
+:::
+
+### Controlled vs uncontrolled components? {basic}
+
+:::quick
+**Controlled = React state holds the input value (`value` + `onChange`). Uncontrolled = the DOM holds it; you read it with a `ref`.**
+**Why it matters:** controlled makes validation easy; uncontrolled is faster for big forms.
+:::
+
+**📖 Explanation**
+
+```jsx
+// Controlled
+const [email, setEmail] = useState("");
+<input value={email} onChange={(e) => setEmail(e.target.value)} />
+
+// Uncontrolled
+const ref = useRef();
+<input ref={ref} defaultValue="" />  // read ref.current.value on submit
+```
+
+:::say
+- In a **controlled** input, **React state** holds the value and updates on every change.
+- That makes **validation and conditional UI** easy, like disabling a button until the form is valid.
+- An **uncontrolled** input keeps its value **in the DOM**, and I read it with a **ref** when needed.
+- That's simpler for **big forms or file inputs**; **React Hook Form** uses uncontrolled inputs for performance.
+:::
+
+:::ts
+Typed change handler: `(e: React.ChangeEvent<HTMLInputElement>) => setEmail(e.target.value)`. Typed ref: `useRef<HTMLInputElement>(null)`.
+:::
+
+### What is lifting state up, and what is prop drilling? {basic}
+
+:::quick
+**Lifting state up = move shared state to the closest common parent. Prop drilling = passing props through many layers that don't use them.**
+**Why it matters:** fix drilling with Context, a state library or composition.
+:::
+
+**📖 Explanation**
+
+```mermaid
+flowchart TB
+  App["App (holds user)"] --> L["Layout"] --> S["Sidebar"] --> A["Avatar (needs user)"]
+  style L stroke-dasharray: 4 4
+  style S stroke-dasharray: 4 4
+```
+
+**Fixes for drilling:** Context, a state library (Redux Toolkit or Zustand), or **component composition** (pass `children`).
+
+:::say
+- When two siblings need the **same data**, I **lift the state** to their nearest common parent.
+- If that means passing props through **many components that don't use them**, that's **prop drilling**.
+- For app-wide values like the **logged-in user or theme**, I use **Context**.
+- For complex shared state I use **Redux Toolkit**, or I restructure with **`children` composition**.
+:::
+
+### Function components vs class components? {basic}
+
+:::quick
+**Function components use hooks and are shorter, with no `this`. Classes use lifecycle methods. Modern React is function components.**
+**Why it matters:** the only place you still need a class is an error boundary.
+:::
+
+:::say
+- **Class components** use `this.state` and lifecycle methods like `componentDidMount`.
+- **Function components** use **hooks**: shorter, no `this` confusion, and logic is reusable through **custom hooks**.
+- Modern React is built around function components; I only meet classes in **older code**.
+- The exception is **error boundaries**, which still need a class (or a library).
+:::
+
+## Hooks
+
+### How does useState work? Why is the update not immediate? {basic}
+
+:::quick
+**The setter schedules a re-render; it doesn't change the variable now. Use `setX(prev => …)` when the new value depends on the old one.**
+**Why it matters:** explains the classic "I called setCount three times but it only went up by one" bug.
+:::
+
+**📖 Explanation**
+
+```jsx
+const [count, setCount] = useState(0);
+
+function addThree() {
+  setCount(count + 1);
+  setCount(count + 1);
+  setCount(count + 1);   // count is still 0 here → result: 1 ❌
+}
+function addThreeCorrect() {
+  setCount((c) => c + 1);
+  setCount((c) => c + 1);
+  setCount((c) => c + 1); // uses the latest value → result: 3 ✅
+}
+```
+
+- State updates are **scheduled and batched**; the new value appears on the **next render**.
+- `count` inside the function is a **snapshot** of this render (a closure).
+- Use the **functional update** `setX(prev => …)` when the new value depends on the old one.
+
+:::say
+- **`useState`** returns the **current value** and a **setter**.
+- Calling the setter **doesn't change the variable immediately**; it **schedules a re-render**, and React **batches** several updates together.
+- Inside one render, state is a **snapshot**, so if the next value depends on the previous one, I use the **functional form**: `setCount(c => c + 1)`.
+- For objects and arrays I always pass a **new copy**, never mutate.
+:::
+
+:::ts
+`useState(0)` is inferred as `number`. Pass the type when it starts empty: `useState<Retreat[]>([])`, or `useState<User | null>(null)`.
+:::
+
+### Explain useEffect: dependencies and cleanup. {basic}
+
+:::quick
+**`useEffect` runs side effects after render. The dependency array decides when it re-runs; the returned function is the cleanup.**
+**Why it matters:** wrong dependencies or missing cleanup cause stale data, memory leaks and race conditions.
+:::
+
+**📖 Explanation**
+
+`useEffect` is for **side effects**: fetching data, subscriptions, timers, DOM work.
+
+| Dependency array | Runs |
+|---|---|
+| none | after **every** render |
+| `[]` | once after the first render (mount) |
+| `[a, b]` | on mount, and whenever `a` or `b` changes |
+
+```jsx
+useEffect(() => {
+  const controller = new AbortController();
+  fetch(`/api/tasks?status=${status}`, { signal: controller.signal })
+    .then((r) => r.json()).then(setTasks).catch(() => {});
+  return () => controller.abort();   // cleanup: cancel the old request
+}, [status]);
+```
+
+```mermaid
+flowchart LR
+  R["Render"] --> C["Commit to DOM"] --> E["Effect runs"]
+  E -->|"deps change / unmount"| CL["Cleanup runs first"] --> E2["Effect runs again"]
+```
+
+:::say
+- **`useEffect`** runs **side effects after React updates the screen**.
+- The **dependency array** controls when: **empty** means once on mount; **with values**, it re-runs whenever they change.
+- The function I **return** is the **cleanup**: it runs **before the next effect and on unmount**.
+- I use cleanup to **clear timers, unsubscribe and abort fetch requests**, which prevents memory leaks and race conditions.
+:::
+
+:::warn
+- Missing dependencies cause stale data. Follow the ESLint `exhaustive-deps` rule.
+- Objects or functions created during render in the dependency array make the effect re-run on every render.
+- Don't use effects for values you can calculate during render.
+:::
+
+### How do class lifecycle methods map to hooks? {mid}
+
+:::quick
+**Mount = `useEffect(fn, [])`. Update = `useEffect(fn, [x])`. Unmount = the cleanup function. `shouldComponentUpdate` = `React.memo`.**
+**Why it matters:** a common bridge question when the company has older code.
+:::
+
+**📖 Explanation**
+
+| Class | Hooks |
+|---|---|
+| `componentDidMount` | `useEffect(fn, [])` |
+| `componentDidUpdate` (when x changes) | `useEffect(fn, [x])` |
+| `componentWillUnmount` | the cleanup function returned from `useEffect` |
+| `shouldComponentUpdate` | `React.memo` |
+
+:::say
+- **Mount** is `useEffect` with an **empty array**.
+- **Update** is `useEffect` **with dependencies**.
+- **Unmount** is the **cleanup function** returned from the effect.
+- `shouldComponentUpdate` becomes **`React.memo`**.
+- The big difference: hooks **group code by feature**, not by lifecycle phase.
+:::
+
+### What is useRef used for? {basic}
+
+:::quick
+**`useRef` gives a box (`ref.current`) that survives re-renders and doesn't cause one when changed. Used for DOM access and remembering values.**
+**Why it matters:** focusing inputs, storing timer IDs and previous values.
+:::
+
+**📖 Explanation**
+
+1. **Access DOM elements:** focus an input, scroll, measure.
+2. **Keep values between renders** without re-rendering: a timer ID, the previous value, an "is mounted" flag.
+
+```jsx
+const inputRef = useRef(null);
+useEffect(() => inputRef.current.focus(), []);
+return <input ref={inputRef} />;
+```
+
+:::say
+- **`useRef`** returns an object whose **`current`** property **persists across renders**.
+- Changing it **doesn't trigger a re-render**.
+- I use it to **reach DOM elements**, like focusing an input.
+- And to store **non-UI values**, like an **interval ID** or the **previous value** of a prop.
+:::
+
+:::ts
+DOM ref: `useRef<HTMLInputElement>(null)` and use `inputRef.current?.focus()`. Value ref: `useRef<number | null>(null)` for a timer ID.
+:::
+
+### useMemo vs useCallback? When should you use them? {mid}
+
+:::quick
+**`useMemo` caches a value; `useCallback` caches a function. Use them for expensive calculations and for stable props to `React.memo` children.**
+**Why it matters:** don't wrap everything; memoization has its own cost.
+:::
+
+**📖 Explanation**
+
+- `useMemo(() => compute(a), [a])` → caches a **value**.
+- `useCallback(fn, [a])` → caches a **function** (same reference between renders).
+
+```jsx
+const stats = useMemo(() => computeWeeklyStats(tasks), [tasks]); // heavy calculation
+const onToggle = useCallback((id) => dispatch(toggle(id)), [dispatch]);
+<TaskList tasks={tasks} onToggle={onToggle} />  // TaskList wrapped in React.memo
+```
+
+:::say
+- **`useMemo`** caches the **result** of an expensive calculation until its dependencies change.
+- **`useCallback`** caches a **function**, so its reference stays the same between renders.
+- They matter in two cases: **expensive computations**, and **passing props to children wrapped in `React.memo`**.
+- I **don't wrap everything**, because memoization has its own cost; I measure first.
+:::
+
+:::proj
+TaskFlow's heatmap and weekly charts are computed from the task list. `useMemo` prevents recomputing them every time unrelated state, like an open modal, changes.
+:::
+
+### How does useContext work, and what are its downsides? {mid}
+
+:::quick
+**Context shares values (user, theme) without passing props through every level. Downside: every consumer re-renders when the value changes.**
+**Why it matters:** fine for rarely changing data; use a state library for data that changes often.
+:::
+
+**📖 Explanation**
+
+```jsx
+const AuthContext = createContext(null);
+function AuthProvider({ children }) {
+  const [user, setUser] = useState(null);
+  const value = useMemo(() => ({ user, setUser }), [user]);
+  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
+}
+const useAuth = () => useContext(AuthContext);
+```
+
+**Fixes for the re-render problem:** split contexts (auth vs theme), memoize the value, or use a state library for frequently changing data.
+
+:::say
+- **Context** shares values like the **logged-in user, theme or language** without prop drilling.
+- The trade-off: **every consumer re-renders** when the context value changes.
+- So I keep contexts **small and focused**, **memoize the value** object with `useMemo`.
+- For **large state that changes often**, I use **Redux Toolkit** instead.
+:::
+
+:::ts
+Type it as `createContext<AuthCtx | null>(null)` and make `useAuth()` **throw** if the context is `null`, so components get a non-null type. See [1b · custom hook and Context](01b-typescript.html#how-do-you-type-a-custom-hook-and-context).
+:::
+
+### When would you use useReducer instead of useState? {mid}
+
+:::quick
+**When state has several related fields or changes through named actions, like a fetch (loading/error/data) or a multi-step form.**
+**Why it matters:** all update logic sits in one pure, testable function.
+:::
+
+**📖 Explanation**
+
+```jsx
+function reducer(state, action) {
+  switch (action.type) {
+    case "start":   return { ...state, loading: true, error: null };
+    case "success": return { loading: false, error: null, data: action.payload };
+    case "error":   return { ...state, loading: false, error: action.error };
+    default: return state;
+  }
+}
+const [state, dispatch] = useReducer(reducer, { loading: false, error: null, data: [] });
+```
+
+:::say
+- I use **`useReducer`** when **state transitions are complex**, like a fetch with **loading, error and data**, or a **multi-step booking form**.
+- All the update logic lives in **one pure reducer function**.
+- That's **easier to test** and reason about than many separate `useState` calls.
+- It's the **same idea as Redux**, but local to one component.
+:::
+
+:::ts
+Type actions as a **discriminated union**, so each `case` knows its payload:
+`type Action = { type: "start" } | { type: "success"; payload: Task[] } | { type: "error"; error: string };`
+:::
+
+### What is a custom hook? Give an example. {mid}
+
+:::quick
+**A function whose name starts with `use` that reuses stateful logic between components, like `useDebounce` or `useFetch`.**
+**Why it matters:** keeps components small and logic reusable; every user gets its own state.
+:::
+
+**📖 Explanation**
+
+```jsx
+function useDebounce(value, delay = 300) {
+  const [debounced, setDebounced] = useState(value);
+  useEffect(() => {
+    const id = setTimeout(() => setDebounced(value), delay);
+    return () => clearTimeout(id);
+  }, [value, delay]);
+  return debounced;
+}
+
+// usage: search teachers only after the user stops typing
+const debouncedQuery = useDebounce(query);
+useEffect(() => { if (debouncedQuery) searchTeachers(debouncedQuery); }, [debouncedQuery]);
+```
+
+:::say
+- A **custom hook** extracts **reusable logic** that uses other hooks.
+- It's just a function whose name **starts with `use`**.
+- Example: **`useDebounce`** delays a search value until the user stops typing; **`useFetch`** handles loading, error and abort.
+- Each component that uses it gets its **own independent state**.
+:::
+
+:::ts
+A generic hook keeps the type: `function useDebounce<T>(value: T, delay = 300): T`.
+:::
+
+### What are the rules of hooks? Why do they exist? {basic}
+
+:::quick
+**Call hooks only at the top level (not in loops or conditions), and only in components or custom hooks.**
+**Why it matters:** React tracks hooks by call order; changing the order mixes up their state.
+:::
+
+**📖 Explanation**
+
+1. Call hooks **only at the top level**: not inside loops, conditions or nested functions.
+2. Call hooks **only from React functions**: components or custom hooks.
+
+:::say
+- Hooks must be called **in the same order on every render**.
+- So only at the **top level** of a component or custom hook, **never inside conditions or loops**.
+- React tracks hooks **by their call order**; if the order changes, state gets attached to the **wrong hook**.
+- The **ESLint plugin** catches these mistakes.
+:::
+
+### useEffect vs useLayoutEffect? {adv}
+
+:::quick
+**`useEffect` runs after the browser paints (default). `useLayoutEffect` runs before paint, for measuring layout without flicker.**
+**Why it matters:** `useLayoutEffect` blocks painting, so use it only when needed.
+:::
+
+**📖 Explanation**
+
+| `useEffect` | `useLayoutEffect` |
+|---|---|
+| Runs **after** the browser paints | Runs **before** paint, synchronously |
+| Default choice; doesn't block the screen | Use for measuring layout or preventing flicker |
+
+:::say
+- **`useEffect`** runs **after the browser has painted**, so it doesn't block the UI; it's right for almost everything.
+- **`useLayoutEffect`** runs **before paint**, synchronously.
+- I'd use it only to **measure an element and adjust layout** without a visible flicker, like positioning a tooltip.
+:::
+
+## Rendering & performance
+
+### When does a component re-render? {mid}
+
+:::quick
+**When its state changes, when its parent re-renders, or when a context it uses changes.**
+**Why it matters:** children re-render with their parent even if their props didn't change, a common misconception.
+:::
+
+**📖 Explanation**
+
+1. Its **state** changes
+2. Its **parent** re-renders (by default, even if its props didn't change!)
+3. A **context** it uses changes
+
+```mermaid
+flowchart TB
+  P["Parent state changes"] --> PR["Parent re-renders"] --> C1["Child A re-renders"]
+  PR --> C2["Child B re-renders<br/>(even if props are the same)"]
+  C2 -.->|"wrap in React.memo"| SK["skipped if props are shallow-equal"]
+```
+
+:::say
+- A component re-renders when its **own state changes**, when its **parent re-renders**, or when a **context it reads changes**.
+- A common misconception is that it re-renders only when **props** change; actually children re-render **with their parent by default**.
+- Re-rendering isn't always a problem.
+- For heavy components I use **`React.memo`** with stable props from **`useMemo` and `useCallback`**.
+:::
+
+### What is React.memo? {mid}
+
+:::quick
+**`React.memo` skips re-rendering a component if its props are shallow-equal to last time.**
+**Why it matters:** it only works if the props are stable; pair it with `useCallback`.
+:::
+
+**📖 Explanation**
+
+```jsx
+const TaskRow = React.memo(function TaskRow({ task, onToggle }) { /* ... */ });
+```
+
+:::warn
+If you pass a new object or a new arrow function on every render (`onToggle={() => …}`), the props are never equal, so `memo` does nothing. Combine it with `useCallback` and `useMemo`.
+:::
+
+:::say
+- **`React.memo`** wraps a component so React **skips re-rendering** it when its props haven't changed, using a **shallow comparison**.
+- It only helps if the **props are stable**, so I pair it with **`useCallback`** for handlers.
+- I apply it to components that are **expensive or rendered many times**, like rows in a long list.
+- I confirm with the **React DevTools Profiler** first that they really re-render needlessly.
+:::
+
+### How do you optimise a slow React app? {adv}
+
+:::quick
+**Measure first (React Profiler, Lighthouse), then fix the actual cause: re-renders, bundle size, long lists, heavy work or slow APIs.**
+**Why it matters:** "measure, then fix" is what interviewers want to hear, not a list of tricks.
+:::
+
+**📖 Explanation**
+
+```mermaid
+flowchart LR
+  M["1 · Measure<br/>React Profiler, Lighthouse"] --> F["2 · Find the cause"] --> X["3 · Fix"]
+  X --> a["Unneeded re-renders → memo, useCallback, split state"]
+  X --> b["Big bundle → lazy() + Suspense, code splitting"]
+  X --> c["Long lists → virtualization, pagination"]
+  X --> d["Heavy work → useMemo, move to server"]
+  X --> e["Slow API → caching (RTK Query / React Query), debounce"]
+```
+
+:::say
+- First I **measure**: the **React Profiler** shows which components re-render; **Lighthouse** shows load performance.
+- Then I fix the **actual cause**:
+- **Unneeded re-renders** → memoization, and keeping state as **local** as possible.
+- **Big bundle** → `React.lazy` and `Suspense` to split by route.
+- **Long lists** → virtualization or pagination; **search inputs** → debounce; **slow APIs** → caching.
+- At **Snowa**, lazy loading and code splitting noticeably improved the dashboard's initial load.
+:::
+
+### What is code splitting / lazy loading? {mid}
+
+:::quick
+**Load parts of the app only when needed, with `React.lazy(() => import(...))` and `Suspense` for a loading fallback.**
+**Why it matters:** a smaller first download means a faster first screen; splitting by route is the easiest win.
+:::
+
+**📖 Explanation**
+
+```jsx
+const Reports = React.lazy(() => import("./pages/Reports"));
+<Suspense fallback={<Spinner />}>
+  <Reports />
+</Suspense>
+```
+
+:::say
+- Instead of shipping the whole app in **one big JavaScript file**, code splitting loads parts **only when needed**.
+- With **`React.lazy`** and dynamic **`import()`**, a page like Reports downloads **only when the user opens it**.
+- **`Suspense`** shows a fallback, like a spinner, meanwhile.
+- **Splitting by route** is the easiest big win.
+:::
+
+## State management
+
+### Context vs Redux (Redux Toolkit): when do you use each? {mid}
+
+:::quick
+**Context for small, rarely changing global values (user, theme). Redux Toolkit for large, frequently updated shared state.**
+**Why it matters:** Redux re-renders only components whose selected slice changed; Context re-renders all consumers.
+:::
+
+**📖 Explanation**
+
+| | Context | Redux Toolkit |
+|---|---|---|
+| Best for | Small, rarely changing global values (user, theme) | Large, frequently updated, shared state |
+| Re-renders | All consumers on any change | Only components whose selected slice changes |
+| DevTools / time travel | ❌ | ✅ |
+| Async helpers | DIY | `createAsyncThunk`, RTK Query |
+
+:::say
+- **Context** is built in and great for values that **rarely change**, like the current user or theme.
+- For **bigger, frequently updated state** shared across many screens, like TaskFlow's tasks and filters, I use **Redux Toolkit**.
+- With Redux, components **subscribe only to the slice they select**, so fewer re-renders.
+- I also get **DevTools** for debugging, and **`createAsyncThunk` or RTK Query** for API calls.
+:::
+
+### Server state vs client state: what are React Query / RTK Query for? {mid}
+
+:::quick
+**Server state = data from the API (tasks, bookings). Client state = UI-only data (open modal, selected tab). Query libraries manage server state: caching, refetching and loading states.**
+**Why it matters:** most "global state" is really server data; a query library removes a lot of hand-written code.
+:::
+
+**📖 Explanation**
+
+| | Server state | Client state |
+|---|---|---|
+| Lives | on the server, the UI has a copy | only in the browser |
+| Examples | retreats, bookings, user profile | modal open, form draft, theme |
+| Tool | **React Query / RTK Query** | `useState`, Context, Redux |
+
+```jsx
+const { data, isLoading, error } = useQuery({
+  queryKey: ["retreats", city],
+  queryFn: () => fetch(`/api/retreats?city=${city}`).then(r => r.json()),
+});
+```
+
+:::say
+- I separate **server state**, data that comes from the API, from **client state**, which is UI-only.
+- For server state I use a query library like **React Query or RTK Query**.
+- It gives me **caching, loading and error states, automatic refetching and deduplication** for free.
+- Then my **Redux or Context** only holds real UI state, which keeps the app much simpler.
+:::
+
+:::ts
+`useQuery<Retreat[]>` (or a typed `queryFn` that returns `Promise<Retreat[]>`) makes `data` typed as `Retreat[] | undefined`.
+:::
+
+### Explain the Redux / Redux Toolkit data flow. {mid}
+
+:::quick
+**Component dispatches an action → reducer returns new state → store updates → components read it with `useSelector`.**
+**Why it matters:** a one-way, predictable data flow you can debug with DevTools.
+:::
+
+**📖 Explanation**
+
+```mermaid
+flowchart LR
+  UI["Component"] -->|"dispatch(action)"| ST["Store"]
+  ST -->|"(state, action)"| R["Reducer / slice<br/>returns new state"]
+  R --> ST
+  ST -->|"useSelector"| UI
+  UI -->|"async"| TH["createAsyncThunk → API"] -->|"pending / fulfilled / rejected"| ST
+```
+
+```js
+const tasksSlice = createSlice({
+  name: "tasks",
+  initialState: { items: [], status: "idle" },
+  reducers: {
+    toggle(state, action) {                    // looks like mutation…
+      const t = state.items.find((x) => x._id === action.payload);
+      t.done = !t.done;                        // …but Immer makes it immutable
+    },
+  },
+});
+```
+
+:::say
+- Components **dispatch actions**.
+- The store passes the **current state and the action** to a **reducer**, which returns the **new state**.
+- Components read state with **`useSelector`** and re-render only when **their selected part** changes.
+- **Redux Toolkit** removes the boilerplate: **`createSlice`** generates actions and reducers, and **Immer** lets me write "mutating" code that stays immutable.
+- Async calls go through **`createAsyncThunk`**, which dispatches pending, fulfilled and rejected actions.
+:::
+
+:::ts
+Redux Toolkit is written in TypeScript. Export `type RootState = ReturnType<typeof store.getState>` and `type AppDispatch = typeof store.dispatch`, then create typed hooks: `useAppSelector`, `useAppDispatch`.
+:::
+
+### How did you implement optimistic updates (TaskFlow)? {mid}
+
+:::quick
+**Update the UI immediately, call the API, and roll back to the saved previous value if it fails.**
+**Why it matters:** the app feels instant, but you must handle the failure path.
+:::
+
+:::say
+- When a user ticks a task, I **update the Redux state immediately**, so the UI feels instant.
+- I **keep a copy of the previous value**.
+- Then I **call the API**; if it fails, I **restore the previous state** and show an error.
+- It's a trade-off: **better perceived speed**, in exchange for handling failures carefully.
+:::
+
+:::proj
+See Doc 9 → TaskFlow for the full diagram and follow-ups.
+:::
+
+## Data fetching, forms & routing
+
+### How do you fetch data correctly in React? (loading, error, race conditions) {mid}
+
+:::quick
+**Always handle loading, success and error. Abort the old request in the effect cleanup so a slow old response can't overwrite new data.**
+**Why it matters:** race conditions are the hidden bug in most hand-written fetching code.
+:::
+
+**📖 Explanation**
+
+```jsx
+function useTasks(status) {
+  const [state, setState] = useState({ data: [], loading: true, error: null });
+  useEffect(() => {
+    const ctrl = new AbortController();
+    setState((s) => ({ ...s, loading: true }));
+    fetch(`/api/tasks?status=${status}`, { signal: ctrl.signal })
+      .then((r) => { if (!r.ok) throw new Error(r.status); return r.json(); })
+      .then((data) => setState({ data, loading: false, error: null }))
+      .catch((e) => { if (e.name !== "AbortError") setState({ data: [], loading: false, error: e.message }); });
+    return () => ctrl.abort();   // old request can't overwrite new results
+  }, [status]);
+  return state;
+}
+```
+
+:::say
+- I always handle **three states**: **loading, success and error**.
+- I check **`res.ok`**, because `fetch` doesn't throw on 404 or 500.
+- To avoid **race conditions**, where a slow old request overwrites a newer one, I **abort the previous request** in the effect's cleanup with **`AbortController`**.
+- In bigger apps I prefer **RTK Query or React Query**, which add caching and refetching out of the box.
+:::
+
+### How do you build protected routes? {mid}
+
+:::quick
+**Wrap private pages in a `ProtectedRoute` that checks the user and role and redirects to login. Real security is on the backend.**
+**Why it matters:** saying "frontend guards are security" is a red flag.
+:::
+
+**📖 Explanation**
+
+```jsx
+function ProtectedRoute({ roles, children }) {
+  const { user } = useAuth();
+  if (!user) return <Navigate to="/login" replace />;
+  if (roles && !roles.includes(user.role)) return <Navigate to="/unauthorized" replace />;
+  return children;
+}
+<Route path="/admin" element={<ProtectedRoute roles={["admin"]}><AdminDashboard /></ProtectedRoute>} />
+```
+
+:::say
+- With **React Router**, I wrap private pages in a **`ProtectedRoute`** component.
+- It checks the **logged-in user and role**, and **redirects to login** if needed.
+- In **VTMS**, that's how the **teacher, school and admin dashboards** are separated.
+- This is only for **user experience**; **real security is on the backend**, where every API route checks the token and role.
+:::
+
+:::warn
+Saying that frontend route guards are "security". They aren't; anyone can call the API directly.
+:::
+
+### How do you handle forms and validation? {basic}
+
+:::quick
+**Small forms: controlled inputs + validate on submit. Big forms: React Hook Form + Zod/Yup. Always validate again on the server.**
+**Why it matters:** client validation is for user experience; server validation is for safety.
+:::
+
+:::say
+- For **small forms**, I use **controlled inputs** with `useState` and validate on submit.
+- For **larger forms**, I use **React Hook Form** with a schema validator like **Zod** or Yup.
+- That keeps **re-renders low** and gives consistent error messages.
+- I always **validate again on the server**, because client-side validation is only for user experience.
+:::
+
+:::ts
+With Zod, one schema can validate the **form** in React (`zodResolver`) and the **request body** in Express, and `z.infer` gives the shared TypeScript type. See [1b · Zod](01b-typescript.html#compile-time-types-vs-runtime-validation-why-do-you-need-zod).
+:::
+
+## Advanced & modern React
+
+### What is an error boundary? {mid}
+
+:::quick
+**A component that catches rendering errors in its children and shows a fallback UI instead of a blank screen.**
+**Why it matters:** it doesn't catch errors in event handlers or async code; use `try/catch` there.
+:::
+
+**📖 Explanation**
+
+```jsx
+class ErrorBoundary extends React.Component {
+  state = { hasError: false };
+  static getDerivedStateFromError() { return { hasError: true }; }
+  componentDidCatch(error, info) { logToService(error, info); }
+  render() { return this.state.hasError ? <p>Something went wrong.</p> : this.props.children; }
+}
+```
+
+:::say
+- An **error boundary** catches JavaScript errors thrown **while rendering its children**.
+- It shows a **fallback UI** instead of a blank screen, and can **log the error**.
+- It still has to be a **class component**, or I use the **`react-error-boundary`** library.
+- It **doesn't catch** errors in **event handlers or async code**; I handle those with `try/catch`.
+:::
+
+### What's new in React 18 and 19? {adv}
+
+:::quick
+**18: automatic batching, concurrent rendering, `useTransition`. 19: Actions for forms, `use()`, `ref` as a prop, stable Server Components.**
+**Why it matters:** shows you keep up with the library you use daily.
+:::
+
+**📖 Explanation**
+
+| Feature | What it does |
+|---|---|
+| **Automatic batching** (18) | Multiple `setState` calls, even in timeouts or promises, cause one render |
+| **Concurrent rendering** (18) | React can pause and prioritise work to keep the UI responsive |
+| **`useTransition` / `useDeferredValue`** (18) | Mark updates as non-urgent (for example, filtering a big list while typing) |
+| **Actions & `useActionState`** (19) | Built-in pending and error handling for form submissions |
+| **`use()`** (19) | Read a promise or context during render, with Suspense |
+| **`ref` as a prop** (19) | No more `forwardRef` boilerplate |
+| **Server Components** (19, via Next.js) | Components that render on the server and send no JS to the client |
+
+:::say
+- **React 18** brought **concurrent rendering** and **automatic batching**, so several state updates anywhere cause **one render**.
+- It added **`useTransition`** to mark slow updates as low priority, so typing stays smooth.
+- **React 19** adds **Actions** for forms with built-in pending states, the **`use`** hook, and **`ref` as a normal prop**.
+- **Server Components** are stable through frameworks like **Next.js**.
+- **VTMS is built on React 19.**
+:::
+
+### CSR vs SSR vs SSG? What is hydration? {mid}
+
+:::quick
+**CSR = built in the browser (dashboards). SSR = built on the server per request (SEO, fresh data). SSG = built at build time (blogs). Hydration = React makes server HTML interactive.**
+**Why it matters:** a marketplace's public pages need SEO, so SSR or SSG matters there.
+:::
+
+**📖 Explanation**
+
+| | Rendered | Good for |
+|---|---|---|
+| **CSR** (Vite React) | in the browser | dashboards behind login |
+| **SSR** (Next.js) | on the server, per request | SEO and fresh data |
+| **SSG** (Next.js) | at build time | blogs, portfolios, docs |
+
+**Hydration:** the browser receives server-rendered HTML, then React attaches event handlers to make it interactive.
+
+:::say
+- **Client-side rendering**: the browser downloads JavaScript and builds the page; fine for **logged-in dashboards** like VTMS.
+- **Server-side rendering**: HTML is built **on the server per request**; better for **SEO and first load**.
+- **Static generation**: pages are built **at build time**, like my **Next.js portfolio**.
+- **Hydration** is when React takes the server HTML and **attaches the interactivity**.
+- For a **marketplace**, I'd render public listing pages with **SSR or SSG** for SEO, and keep the dashboard client-side.
+:::
+
+### Why do effects run twice in development? (StrictMode) {mid}
+
+:::quick
+**StrictMode mounts, unmounts and re-mounts components in development only, to expose effects that are missing cleanup.**
+**Why it matters:** if running twice causes a bug, your cleanup is missing.
+:::
+
+:::say
+- In **development**, React **StrictMode** intentionally **mounts, unmounts and re-mounts** components.
+- It's there to reveal **effects without proper cleanup**.
+- It **only happens in development**, not production.
+- If running twice causes a bug, like a **double subscription**, the effect's **cleanup is missing**.
+:::
+
+### How do you test React components? {mid}
+
+:::quick
+**React Testing Library + Jest/Vitest: test behaviour like a user (find by label or role, type, click, check the screen), and mock APIs with MSW.**
+**Why it matters:** testing is a "good to have" for the Kochi role.
+:::
+
+**📖 Explanation**
+
+```jsx
+render(<Login />);
+await userEvent.type(screen.getByLabelText(/email/i), "a@b.com");
+await userEvent.click(screen.getByRole("button", { name: /sign in/i }));
+expect(await screen.findByText(/welcome/i)).toBeInTheDocument();
+```
+
+:::say
+- I use **React Testing Library** with **Jest or Vitest**.
+- I test **behaviour the way a user would**: find elements by **label or role**, type, click, and check what appears on screen.
+- I **don't test internal state**, so tests survive refactors.
+- API calls are **mocked**, for example with **MSW**.
+- I focus tests on important flows like **login, forms and permissions**.
+:::
+
+### How do you structure a React + TypeScript project? {mid}
+
+:::quick
+**Group by feature (`features/bookings/` with its components, hooks, API calls and types), plus shared `components/`, `hooks/` and `lib/`.**
+**Why it matters:** in a founding team you set the structure that everyone follows later.
+:::
+
+**📖 Explanation**
+
+```
+src/
+  app/            ← routes, providers, layout
+  features/
+    retreats/     ← RetreatList.tsx, RetreatCard.tsx, useRetreats.ts, api.ts, types.ts
+    bookings/     ← BookingForm.tsx, useBooking.ts, api.ts, schema.ts
+  components/     ← shared UI: Button, Modal, Spinner
+  hooks/          ← shared hooks: useDebounce, useAuth
+  lib/            ← api client, formatters
+```
+
+:::say
+- I organise by **feature**, not by file type: everything for **bookings** lives in `features/bookings`.
+- Each feature has its **components, hooks, API calls and types** together, so changes stay in one place.
+- **Shared** UI pieces, hooks and helpers go in `components/`, `hooks/` and `lib/`.
+- With TypeScript, API types come from a **shared package** or **Zod schemas**, so the frontend and backend stay in sync.
+:::
+
+## Practice problems
+
+These are pure-logic versions of things React does internally. You can run them right here.
+
+### Practice 1: Write shallowEqual (how React.memo compares props) {mid}
+
+Return `true` if two objects have the same keys and each value is `===` equal (top level only).
+
+:::practice
+```js starter
+function shallowEqual(a, b) {
+  // your code here
+}
+```
+```js tests
+check(shallowEqual({ x: 1, y: "a" }, { x: 1, y: "a" }), true, "same primitives");
+check(shallowEqual({ x: 1 }, { x: 2 }), false, "different value");
+check(shallowEqual({ x: 1 }, { x: 1, y: 2 }), false, "different key count");
+const fn = () => {};
+check(shallowEqual({ cb: fn }, { cb: fn }), true, "same function reference");
+check(shallowEqual({ cb: () => {} }, { cb: () => {} }), false, "new function each render (why useCallback matters)");
+```
+:::
+
+:::hint
+Compare `Object.keys(a).length` with `Object.keys(b).length` first.
+:::
+
+:::hint
+Then check that every key of `a` exists in `b`, with `a[key] === b[key]` (or `Object.is`).
+:::
+
+:::solution
+```js
+function shallowEqual(a, b) {
+  if (Object.is(a, b)) return true;
+  const ka = Object.keys(a), kb = Object.keys(b);
+  if (ka.length !== kb.length) return false;
+  return ka.every((k) => Object.prototype.hasOwnProperty.call(b, k) && Object.is(a[k], b[k]));
+}
+```
+**Explain it:** this is why `React.memo` fails when you pass a new arrow function each render: two different function objects are never equal.
+:::
+
+### Practice 2: Write a todo reducer {basic}
+
+Handle `add`, `toggle` and `remove` **without mutating** the state.
+
+:::practice
+```js starter
+function todosReducer(state, action) {
+  // state is an array of { id, text, done }
+  // your code here
+}
+```
+```js tests
+let s = [];
+s = todosReducer(s, { type: "add", id: 1, text: "Learn hooks" });
+check(s, [{ id: 1, text: "Learn hooks", done: false }], "add");
+const before = s;
+s = todosReducer(s, { type: "toggle", id: 1 });
+check(s[0].done, true, "toggle");
+check(before[0].done, false, "original state not mutated");
+s = todosReducer(s, { type: "remove", id: 1 });
+check(s, [], "remove");
+check(todosReducer([], { type: "unknown" }), [], "unknown action returns state");
+```
+:::
+
+:::hint
+Use a `switch` on `action.type`. `add` → `[...state, newTodo]`.
+:::
+
+:::hint
+`toggle` → `state.map(t => t.id === action.id ? { ...t, done: !t.done } : t)`. `remove` → `filter`.
+:::
+
+:::solution
+```js
+function todosReducer(state, action) {
+  switch (action.type) {
+    case "add": return [...state, { id: action.id, text: action.text, done: false }];
+    case "toggle": return state.map((t) => (t.id === action.id ? { ...t, done: !t.done } : t));
+    case "remove": return state.filter((t) => t.id !== action.id);
+    default: return state;
+  }
+}
+```
+**Explain it:** every case returns a **new** array or object, so React and Redux can detect the change by reference.
+:::
+
+### Practice 3: Build a mini Redux store {adv}
+
+`createStore(reducer, initialState)` returns `{ getState, dispatch, subscribe }`. `subscribe` returns an unsubscribe function.
+
+:::practice
+```js starter
+function createStore(reducer, initialState) {
+  // your code here
+}
+```
+```js tests
+const counter = (s, a) => (a.type === "inc" ? s + 1 : s);
+const store = createStore(counter, 0);
+let calls = 0;
+const unsub = store.subscribe(() => calls++);
+store.dispatch({ type: "inc" }); store.dispatch({ type: "inc" });
+check(store.getState(), 2, "state updated by reducer");
+check(calls, 2, "listeners called on each dispatch");
+unsub(); store.dispatch({ type: "inc" });
+check(calls, 2, "unsubscribed listener not called");
+check(store.getState(), 3, "state still updates");
+```
+:::
+
+:::hint
+Keep `state` and a `listeners` array in a closure.
+:::
+
+:::hint
+`dispatch(action)`: `state = reducer(state, action)`, then call each listener. `subscribe(fn)`: push it and return `() => remove fn`.
+:::
+
+:::solution
+```js
+function createStore(reducer, initialState) {
+  let state = initialState;
+  let listeners = [];
+  return {
+    getState: () => state,
+    dispatch(action) { state = reducer(state, action); listeners.forEach((l) => l()); },
+    subscribe(fn) { listeners.push(fn); return () => { listeners = listeners.filter((l) => l !== fn); }; },
+  };
+}
+```
+**Explain it:** this is the core of Redux: a closure, a pure reducer and the observer pattern. `useSelector` is basically a subscription that re-renders when the selected value changes.
+:::
+
+### Practice 4: Paginate a list (for a dashboard table) {basic}
+
+`paginate(items, page, pageSize)` returns `{ data, totalPages, hasNext, hasPrev }`. Pages start at 1.
+
+:::practice
+```js starter
+function paginate(items, page, pageSize) {
+  // your code here
+}
+```
+```js tests
+const nums = [1, 2, 3, 4, 5, 6, 7];
+check(paginate(nums, 1, 3), { data: [1, 2, 3], totalPages: 3, hasNext: true, hasPrev: false }, "first page");
+check(paginate(nums, 3, 3), { data: [7], totalPages: 3, hasNext: false, hasPrev: true }, "last page");
+check(paginate([], 1, 5), { data: [], totalPages: 0, hasNext: false, hasPrev: false }, "empty list");
+```
+:::
+
+:::hint
+`start = (page - 1) * pageSize`, then use `slice(start, start + pageSize)`.
+:::
+
+:::hint
+`totalPages = Math.ceil(items.length / pageSize)`; `hasNext = page < totalPages`; `hasPrev = page > 1`.
+:::
+
+:::solution
+```js
+function paginate(items, page, pageSize) {
+  const totalPages = Math.ceil(items.length / pageSize);
+  const start = (page - 1) * pageSize;
+  return { data: items.slice(start, start + pageSize), totalPages, hasNext: page < totalPages, hasPrev: page > 1 };
+}
+```
+**Explain it:** on the server, the same idea becomes `LIMIT … OFFSET …` in SQL or `skip((page-1)*limit).limit(limit)` in MongoDB.
+:::
+
+### Practice 5: Filter and sort teachers for a search box {mid}
+
+`searchTeachers(list, query, sortBy)`: case-insensitive match on `name` or `subject`, then sort by `sortBy` descending (for example `score`).
+
+:::practice
+```js starter
+function searchTeachers(list, query, sortBy) {
+  // your code here
+}
+```
+```js tests
+const t = [{ name: "Anita", subject: "Maths", score: 81 }, { name: "Ravi", subject: "Science", score: 92 }, { name: "Mathew", subject: "English", score: 64 }];
+check(searchTeachers(t, "math", "score").map(x => x.name), ["Anita", "Mathew"], "matches name or subject, sorted by score");
+check(searchTeachers(t, "", "score").map(x => x.name), ["Ravi", "Anita", "Mathew"], "empty query returns all, sorted");
+check(t[0].name, "Anita", "original array not reordered");
+```
+:::
+
+:::hint
+Lowercase the query once. `filter` items where `name` or `subject` (lowercased) `includes` it.
+:::
+
+:::hint
+`sort` mutates the array in place, so make sure you sort a copy, e.g. `[...filtered].sort((a, b) => b[sortBy] - a[sortBy])`.
+:::
+
+:::solution
+```js
+function searchTeachers(list, query, sortBy) {
+  const q = query.trim().toLowerCase();
+  return list
+    .filter((t) => !q || t.name.toLowerCase().includes(q) || t.subject.toLowerCase().includes(q))
+    .sort((a, b) => b[sortBy] - a[sortBy]);
+}
+```
+**Explain it:** `filter` returns a new array, so sorting it doesn't touch the original. In React, wrap this in `useMemo([list, query, sortBy])` and debounce the query.
+:::
+</script>
+<script src="assets/viewer.js?v=8"></script>
+</body>
+</html>

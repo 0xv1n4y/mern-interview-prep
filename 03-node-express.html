@@ -1,0 +1,1213 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Node & Express · MERN Interview Prep</title>
+<link rel="stylesheet" href="assets/style.css?v=8">
+</head>
+<body>
+<script type="text/markdown" id="doc">
+# 3 · Node.js & Express
+
+Backend questions test whether you understand **how a request flows through your server, how you secure it, and how you handle errors**. VTMS, Digital Classroom and TaskFlow give you real examples for almost every answer.
+
+:::note
+**How to read each card:** ⚡ **Quick answer** first (say it in 10 seconds) → 📖 **Explanation** once → 🎤 **Interview answer** out loud, point by point → 🔷 **TypeScript angle** for the Kochi role. Full Express + TypeScript details are in [1b · TypeScript](01b-typescript.html#typescript-with-node-express-postgresql).
+:::
+
+## Node.js fundamentals
+
+### What is Node.js, and why is it good for APIs? {basic}
+
+:::quick
+**Node.js runs JavaScript on the server (V8 engine + libuv). It's non-blocking: while it waits for the database or network, it serves other requests.**
+**Why it matters:** very efficient for I/O-heavy APIs, and one language across the whole stack.
+:::
+
+**📖 Explanation**
+
+- **V8:** Chrome's engine that runs the JavaScript.
+- **libuv:** the library that handles async I/O (files, network, timers) and a small thread pool.
+- **Event-driven, non-blocking:** slow work is handed off; the thread stays free for other requests.
+
+:::say
+- **Node.js** lets us run **JavaScript on the server**, using Chrome's **V8 engine** plus **libuv** for async I/O.
+- It's **single-threaded** for our code but **non-blocking**: while it waits for a database or network call, it **handles other requests**.
+- That makes it very efficient for **I/O-heavy APIs** like the ones I build.
+- And I use **one language across the whole stack**, React to Node.
+:::
+
+:::tip
+"When is Node a bad choice?" → "For CPU-heavy work like video encoding or big calculations, which would block the event loop. Then I'd use worker threads or a separate service."
+:::
+
+### If Node is single-threaded, how does it handle many requests at once? {mid}
+
+:::quick
+**Our JavaScript runs on one thread, but slow I/O is handed to the OS / libuv. The event loop keeps taking new requests and runs each callback when its I/O finishes.**
+**Why it matters:** one thread can serve thousands of connections, unless a request does heavy CPU work.
+:::
+
+**📖 Explanation**
+
+```mermaid
+flowchart LR
+  R1["Request 1"] & R2["Request 2"] & R3["Request 3"] --> EL["Event loop<br/>(1 thread runs JS)"]
+  EL -->|"DB / network / file"| OS["OS async I/O +<br/>libuv thread pool (4)"]
+  OS -->|"callback when done"| EL
+  EL --> RES["Responses"]
+```
+
+**Analogy:** one waiter taking orders at many tables. He doesn't stand in the kitchen while the food cooks; he takes the next order and serves each dish when the kitchen rings.
+
+:::say
+- Our JavaScript runs on a **single thread**.
+- The slow work, like **database queries, network calls and file reads**, is handed to the **operating system or libuv's thread pool**.
+- Meanwhile, the **event loop keeps accepting** other requests.
+- When the I/O finishes, its **callback is queued and runs**.
+- So one thread serves **thousands of connections**, as long as **no request does heavy CPU work**.
+:::
+
+### Explain the Node.js event loop phases. {adv}
+
+:::quick
+**Phases: timers → pending callbacks → poll (I/O) → check (`setImmediate`) → close. Between phases: `process.nextTick` first, then promise microtasks.**
+**Why it matters:** explains output-order questions with `nextTick`, promises, `setTimeout` and `setImmediate`.
+:::
+
+**📖 Explanation**
+
+```mermaid
+flowchart TB
+  T["1 · timers<br/>setTimeout / setInterval"] --> P["2 · pending callbacks"] --> I["3 · poll<br/>I/O callbacks (most work)"] --> C["4 · check<br/>setImmediate"] --> CL["5 · close callbacks"] --> T
+  M["⚡ Between every phase:<br/>process.nextTick → Promise microtasks"]
+```
+
+```js
+setTimeout(() => console.log("timeout"), 0);
+setImmediate(() => console.log("immediate"));
+process.nextTick(() => console.log("nextTick"));
+Promise.resolve().then(() => console.log("promise"));
+// nextTick → promise → then timeout/immediate (order of these two can vary in the main module)
+```
+
+:::say
+- Node's event loop **cycles through phases**.
+- **Timers** run `setTimeout` callbacks; the **poll** phase runs most **I/O callbacks**; the **check** phase runs **`setImmediate`**; then **close** callbacks.
+- **Between phases**, it drains the microtask queues: first **`process.nextTick`**, then **promise callbacks**.
+- So `nextTick` runs before promises, and both run **before the next timer or I/O callback**.
+:::
+
+### Blocking vs non-blocking code? {basic}
+
+:::quick
+**Blocking code makes the single thread wait, so every user waits. Use async APIs and move heavy work off the main thread.**
+**Why it matters:** one `readFileSync` or big loop in a route slows the whole server.
+:::
+
+**📖 Explanation**
+
+```js
+// ❌ Blocking: the whole server waits
+const data = fs.readFileSync("big.csv");
+
+// ✅ Non-blocking
+const data2 = await fs.promises.readFile("big.csv");
+
+// ❌ CPU-heavy loop in a request handler blocks ALL users
+app.get("/report", (req, res) => { const r = heavyCalculation(); res.json(r); });
+```
+
+:::say
+- **Blocking** code makes the single thread wait, so **every other request waits too**.
+- Classic mistakes: **synchronous file reads** or a **long CPU loop** inside a route.
+- I use the **async, promise-based APIs**.
+- For genuinely heavy work, I move it to a **worker thread**, a **background job**, or the **database**, like a SQL `GROUP BY` instead of looping in JavaScript.
+:::
+
+### How do you handle CPU-intensive tasks? (cluster vs worker threads) {adv}
+
+:::quick
+**`cluster` / PM2 = several Node processes to use all CPU cores. `worker_threads` = extra threads for one heavy calculation. Queues (BullMQ) for long background jobs.**
+**Why it matters:** keeps the event loop free so the API stays fast.
+:::
+
+**📖 Explanation**
+
+| | `cluster` / PM2 | `worker_threads` |
+|---|---|---|
+| What | Several Node **processes**, one per CPU core | Extra **threads** inside one process |
+| Use for | Scaling an API across cores | Heavy calculations (image resize, parsing big files) |
+| Memory | Separate per process | Can share memory |
+
+:::say
+- To use **all CPU cores** for an API, I run **multiple processes** with **cluster mode**, usually through **PM2**, or several instances behind a load balancer.
+- For a **specific heavy calculation**, I use **worker threads**, so the main event loop stays free.
+- For **long jobs** like big reports or bulk emails, a **background queue** such as **BullMQ** is cleanest.
+:::
+
+### What are streams and buffers? {mid}
+
+:::quick
+**A buffer is raw binary data. A stream processes data piece by piece instead of loading it all into memory.**
+**Why it matters:** large files and exports use constant memory with streams.
+:::
+
+**📖 Explanation**
+
+- **Buffer:** a chunk of raw binary data.
+- **Stream:** data processed **piece by piece**. Types: Readable, Writable, Duplex, Transform.
+- **Backpressure:** `pipe` pauses the source when the destination is slow.
+
+```js
+// Send a 2 GB file without loading it into memory
+app.get("/download", (req, res) => {
+  fs.createReadStream("big-export.csv").pipe(res);
+});
+```
+
+:::say
+- A **buffer** holds **raw binary data**.
+- **Streams** process data **in chunks as it arrives** instead of loading it all into memory.
+- Piping a large file to the response uses **constant memory**, whatever the file size.
+- **`pipe`** also handles **backpressure**: it pauses the source when the destination is slow.
+- I'd use streams for **large exports, uploads or CSV processing**.
+:::
+
+### What is the EventEmitter? {mid}
+
+:::quick
+**Objects emit named events and listeners react to them (the observer pattern). Streams, HTTP servers and sockets are built on it.**
+**Why it matters:** decouples side effects, like sending an email after a booking.
+:::
+
+**📖 Explanation**
+
+```js
+const { EventEmitter } = require("events");
+const bus = new EventEmitter();
+bus.on("class.booked", (cls) => sendConfirmationEmail(cls));
+bus.emit("class.booked", { id: 7, teacher: "A" });
+```
+
+:::say
+- **EventEmitter** lets objects **publish named events** that other code **subscribes** to.
+- **Streams, HTTP servers and sockets** are all built on it.
+- In an app, I'd use it to **decouple side effects**.
+- Example: when a class is booked, **emit an event**, and separate listeners **send the email** and **create the notification**.
+:::
+
+### package.json: dependencies vs devDependencies, package-lock, semver? {basic}
+
+:::quick
+**`dependencies` = needed in production. `devDependencies` = tools only (jest, eslint). The lock file pins exact versions. Semver = MAJOR.MINOR.PATCH.**
+**Why it matters:** identical installs everywhere; major upgrades can break things.
+:::
+
+**📖 Explanation**
+
+- `dependencies`: needed at runtime (express, pg, zod).
+- `devDependencies`: only for development (jest, nodemon, eslint, typescript).
+- `package-lock.json`: locks **exact** versions, so every install is identical.
+- **Semver** `MAJOR.MINOR.PATCH`: `^1.4.2` allows minor and patch updates; `~1.4.2` allows patch only.
+
+:::say
+- **`dependencies`** are packages the app needs **in production**; **`devDependencies`** are tools like **Jest or nodemon**.
+- The **lock file** pins **exact versions**, so local, CI and production installs match.
+- I **commit it** and use **`npm ci`** in deployments.
+- Versions follow **semver**: a **major** bump can break things, so I upgrade those deliberately.
+:::
+
+:::ts
+In a TypeScript project, `typescript`, `tsx` and the `@types/...` packages are **devDependencies**: types are only needed to build, not at runtime.
+:::
+
+### How do you manage configuration and secrets? {basic}
+
+:::quick
+**Environment variables, never in code. `.env` locally (in `.gitignore`), the hosting dashboard in production, and validate them at startup.**
+**Why it matters:** leaked secrets in Git are one of the most common real security incidents.
+:::
+
+**📖 Explanation**
+
+```js
+// config/env.js: fail fast if something is missing
+const required = ["DATABASE_URL", "JWT_SECRET"];
+for (const key of required) if (!process.env[key]) throw new Error(`Missing env: ${key}`);
+```
+
+:::say
+- I keep config in **environment variables**, never in code: **database URLs, JWT secrets, API keys**.
+- Locally they live in a **`.env`** file loaded with **dotenv**, which is in **`.gitignore`**.
+- I commit a **`.env.example`** with just the names.
+- In production they're set in the **hosting dashboard**, like Render's environment settings.
+- I **validate required variables at startup**, so the app fails fast if one is missing.
+:::
+
+:::ts
+Validate env with Zod once and export a typed `env` object: `export const env = z.object({ DATABASE_URL: z.string().url(), PORT: z.coerce.number().default(3000) }).parse(process.env);`. Then `env.PORT` is a `number`, never `string | undefined`.
+:::
+
+## Express essentials
+
+### What is Express, and what is middleware? {basic}
+
+:::quick
+**Express is a minimal web framework for Node. Middleware is a function `(req, res, next)` that runs in order; it can change the request, end the response, or call `next()`.**
+**Why it matters:** auth, validation, logging and error handling are all middleware.
+:::
+
+**📖 Explanation**
+
+```mermaid
+flowchart LR
+  Req["Request"] --> J["express.json()<br/>parse body"] --> C["cors()"] --> A["auth<br/>verify token"] --> V["validate body"] --> H["Route handler"] --> Res["Response"]
+  A -->|"invalid token"| E["401"]
+  H -->|"next(err)"| EH["Error middleware"]
+```
+
+```js
+app.use(express.json());
+app.use(cors({ origin: process.env.CLIENT_URL }));
+app.get("/api/classes", auth, requireRole("school"), getClasses);
+app.use(errorHandler);   // last
+```
+
+:::say
+- **Express** is a lightweight framework on top of Node's HTTP module.
+- Its core idea is **middleware**: functions that get the **request, response and `next`**, and run **in the order they're registered**.
+- Each one can **modify the request**, like adding `req.user` after verifying a token.
+- Or **end the request early**, like returning 401, or call **`next()`** to continue.
+- In VTMS the chain is **body parsing → CORS → auth → role check → validation → handler**, with **one error middleware** at the end.
+:::
+
+### What types of middleware are there? {basic}
+
+:::quick
+**Application-level, router-level, built-in, third-party, and error-handling (4 arguments: `err, req, res, next`).**
+**Why it matters:** Express recognises error handlers only by the 4-argument signature.
+:::
+
+**📖 Explanation**
+
+| Type | Example |
+|---|---|
+| Application-level | `app.use(express.json())` |
+| Router-level | `router.use(auth)` |
+| Built-in | `express.json()`, `express.static()` |
+| Third-party | `cors`, `helmet`, `morgan`, `express-rate-limit` |
+| Error-handling | `(err, req, res, next) => {}`: **4 arguments** |
+
+:::say
+- **Application-level** middleware with `app.use`.
+- **Router-level** middleware attached to a specific router.
+- **Built-in** ones like `express.json`, and **third-party** ones like **CORS, Helmet and rate limiting**.
+- **Error-handling** middleware is special: it takes **four arguments, error first**, and that's how Express recognises it.
+:::
+
+### req.params vs req.query vs req.body? {basic}
+
+:::quick
+**`params` = parts of the URL path (an ID). `query` = after `?` (filters, sorting, pages). `body` = data sent in POST/PUT/PATCH.**
+**Why it matters:** all three are user input, so validate all three.
+:::
+
+**📖 Explanation**
+
+```js
+// GET /api/teachers/42?subject=maths&page=2
+app.get("/api/teachers/:id", (req, res) => {
+  req.params.id;       // "42"     → identifies a resource
+  req.query.subject;   // "maths"  → filters, sorting, pagination
+});
+// POST /api/classes   body: { "teacherId": 42, "time": "..." }
+req.body;              // needs express.json()
+```
+
+:::say
+- **`req.params`** are parts of the **URL path** that identify a resource, like an **ID**.
+- **`req.query`** holds the **query string**, used for **filters, sorting and pagination**.
+- **`req.body`** carries data sent in **POST, PUT or PATCH**, and needs **`express.json()`** to be parsed.
+- All three are **user input**, so I **validate them**; params and query values are always **strings**.
+:::
+
+:::ts
+`req.params.id` is always a `string` in TypeScript too. Convert and check it: `const id = Number(req.params.id); if (Number.isNaN(id)) return res.status(400)…`
+:::
+
+### How do you handle errors centrally in Express? {mid}
+
+:::quick
+**Throw errors (or call `next(err)`) in routes, catch async ones with an `asyncHandler`, and handle all of them in one error middleware at the end.**
+**Why it matters:** consistent error responses, no repeated `try/catch`, no stack traces leaked to users.
+:::
+
+**📖 Explanation**
+
+```js
+class AppError extends Error {
+  constructor(message, status) { super(message); this.status = status; }
+}
+const asyncHandler = (fn) => (req, res, next) => Promise.resolve(fn(req, res, next)).catch(next);
+
+app.get("/api/classes/:id", asyncHandler(async (req, res) => {
+  const cls = await Class.findById(req.params.id);
+  if (!cls) throw new AppError("Class not found", 404);
+  res.json(cls);
+}));
+
+// last middleware
+app.use((err, req, res, next) => {
+  console.error(err);
+  res.status(err.status || 500).json({ message: err.status ? err.message : "Something went wrong" });
+});
+```
+
+:::say
+- I **throw errors** or call **`next(err)`** from routes.
+- An **`asyncHandler`** wrapper catches rejected promises, so I don't repeat `try/catch` everywhere. (Express 5 does this automatically.)
+- A custom **`AppError`** class carries the **status code**.
+- **One error middleware** at the end **logs the full error** but sends the client a **clean message**, never the stack trace in production.
+- That keeps **every error response consistent**.
+:::
+
+:::tip
+"What about errors outside Express?" → "`process.on('unhandledRejection')` and `uncaughtException` to log and shut down gracefully, and a process manager like PM2 or the host to restart."
+:::
+
+:::ts
+```ts
+class AppError extends Error {
+  constructor(message: string, public status = 500) { super(message); }
+}
+app.use((err: unknown, req: Request, res: Response, next: NextFunction) => {
+  const status = err instanceof AppError ? err.status : 500;
+  res.status(status).json({ message: status < 500 && err instanceof Error ? err.message : "Something went wrong" });
+});
+```
+The error is `unknown`, so you check it with `instanceof` before reading fields.
+:::
+
+### How do you structure an Express project? {mid}
+
+:::quick
+**Layers: routes (URLs + middleware) → controllers (HTTP in/out) → services (business logic) → models / db (data). Export `app` separately from `listen` for tests.**
+**Why it matters:** business logic without `req`/`res` is easy to unit-test.
+:::
+
+**📖 Explanation**
+
+```text
+src/
+  config/        db.js, env.js
+  routes/        class.routes.js       → URL + middleware chain
+  controllers/   class.controller.js   → read req, send res
+  services/      matching.service.js   → business logic (no req/res)
+  models/ or db/ Class.js / queries    → Mongoose schemas or SQL
+  middleware/    auth.js, requireRole.js, validate.js, errorHandler.js
+  utils/         AppError.js, asyncHandler.js
+  app.js         express app (exported, for tests)
+  server.js      starts listening
+```
+
+:::say
+- I separate **layers**.
+- **Routes** define URLs and middleware; **controllers** handle the HTTP request and response.
+- **Services** hold the **business logic**, like the VTMS matching engine; **models or the db layer** handle data.
+- Keeping business logic **out of controllers** makes it easy to **unit-test without HTTP**.
+- I **export the Express app** separately from `server.listen`, so **Supertest** can test it.
+:::
+
+### How do you validate request data? {mid}
+
+:::quick
+**Validate every body, params and query against a schema (Zod, Joi or express-validator) in a reusable middleware; return 400 with clear messages.**
+**Why it matters:** never trust the client; frontend validation is only for user experience.
+:::
+
+**📖 Explanation**
+
+```js
+const { z } = require("zod");
+const bookingSchema = z.object({
+  teacherId: z.string().length(24),
+  startsAt: z.string().datetime(),
+  series: z.boolean().default(false),
+});
+const validate = (schema) => (req, res, next) => {
+  const r = schema.safeParse(req.body);
+  if (!r.success) return res.status(400).json({ errors: r.error.flatten() });
+  req.body = r.data; next();
+};
+router.post("/bookings", auth, validate(bookingSchema), createBooking);
+```
+
+:::say
+- I **never trust client input**.
+- I validate **every body, params and query** against a **schema**, using **Zod**, Joi or express-validator.
+- It's a **reusable middleware** that returns **400 with clear messages** if validation fails.
+- The schema also **strips unknown fields** and **applies defaults**, so controllers receive **clean data**.
+- **Frontend validation is for user experience; backend validation is for correctness and security.**
+:::
+
+:::ts
+With Zod, `z.infer<typeof bookingSchema>` gives the TypeScript type from the same schema, so validation and types never drift apart. See [1b · Zod](01b-typescript.html#compile-time-types-vs-runtime-validation-why-do-you-need-zod).
+:::
+
+## REST API design
+
+### What makes a good REST API? {mid}
+
+:::quick
+**Plural-noun resources, HTTP methods for actions, correct status codes, a consistent error format, pagination for lists, and versioning.**
+**Why it matters:** a predictable API is easy for the frontend (and other developers) to use.
+:::
+
+**📖 Explanation**
+
+| Action | Method & URL | Success code |
+|---|---|---|
+| List | `GET /api/retreats?city=kochi&page=2` | 200 |
+| Get one | `GET /api/retreats/:id` | 200 (404 if missing) |
+| Create | `POST /api/bookings` | **201** Created |
+| Replace | `PUT /api/retreats/:id` | 200 |
+| Update part | `PATCH /api/bookings/:id` | 200 |
+| Delete | `DELETE /api/bookings/:id` | 204 No Content |
+
+- **Nouns, plural**, not verbs: `/bookings`, not `/createBooking`.
+- **Nested** for relationships: `/retreats/:id/reviews`.
+- **Versioning:** `/api/v1/...`
+- A consistent error format and **pagination** for lists.
+
+:::say
+- I design resources as **plural nouns** and use **HTTP methods** for actions: GET reads, POST creates, PUT or PATCH updates, DELETE removes.
+- I return **correct status codes**: **201** for created, **404** for not found, **400** for validation errors.
+- I use a **consistent JSON error format** and **paginate** list endpoints.
+- I **version** the API, so changes don't break existing clients.
+:::
+
+### Which HTTP status codes do you use? {basic}
+
+:::quick
+**2xx success, 4xx client mistake, 5xx server failure. 401 = not logged in; 403 = logged in but not allowed.**
+**Why it matters:** 401 vs 403 is asked in almost every backend interview.
+:::
+
+**📖 Explanation**
+
+| Code | Meaning | When |
+|---|---|---|
+| 200 / 201 / 204 | OK / Created / No content | Success |
+| 400 | Bad Request | Validation failed |
+| **401** | Unauthorized | **Not logged in** / invalid token |
+| **403** | Forbidden | Logged in but **not allowed** (wrong role) |
+| 404 | Not Found | Resource missing |
+| 409 | Conflict | Duplicate, e.g. email already exists, or the spot is already booked |
+| 422 | Unprocessable | Valid format but breaks a business rule |
+| 429 | Too Many Requests | Rate limit hit |
+| 500 | Server Error | Unexpected bug |
+
+:::say
+- **2xx** means success, **4xx** means the **client** did something wrong, **5xx** means the **server** failed.
+- **401** means you're **not authenticated**: log in.
+- **403** means you're **authenticated but don't have permission**, like a teacher calling an admin endpoint in VTMS.
+- **409 Conflict** for duplicates, like an email that already exists.
+:::
+
+### PUT vs PATCH? What is idempotency? {mid}
+
+:::quick
+**PUT replaces the whole resource; PATCH changes some fields. Idempotent = repeating the request has the same effect as doing it once.**
+**Why it matters:** networks retry requests, so retries must not create duplicates (or double payments).
+:::
+
+**📖 Explanation**
+
+| Method | Idempotent? |
+|---|---|
+| GET, PUT, DELETE | ✅ |
+| POST | ❌ (each call can create a new item) |
+| PATCH | Depends (`set` yes, `increment` no) |
+
+**Making POST safe:** give each request a unique key (an **idempotency key** or a unique record ID) and let the database reject duplicates.
+
+:::say
+- **PUT** replaces the **entire resource**; **PATCH** changes **only the fields sent**.
+- An operation is **idempotent** if **repeating it gives the same result**, which matters because **networks retry requests**.
+- **POST** normally isn't idempotent, but you can **make it so** with a unique key.
+- In **Digital Classroom**, device uploads are POSTs, yet **resending the same batch is safe**: each record has a **unique key** and PostgreSQL **ignores duplicates** with `ON CONFLICT DO NOTHING`.
+:::
+
+:::proj
+This is your strongest real-world example of idempotency. See Doc 9 → "exactly once". The same idea protects **payments** from being confirmed twice.
+:::
+
+### How do you implement pagination, filtering and sorting? {mid}
+
+:::quick
+**Read `page`, `limit`, filters and `sort` from the query string, cap the limit, scope to the user, and return items + total pages. Use cursor pagination for very large tables.**
+**Why it matters:** every list screen in a marketplace needs it.
+:::
+
+**📖 Explanation**
+
+```js
+// GET /api/retreats?city=kochi&sort=price&page=2&limit=20   (PostgreSQL with pg)
+const page = Math.max(1, Number(req.query.page) || 1);
+const limit = Math.min(100, Number(req.query.limit) || 20);
+const sortCol = { price: "price", newest: "created_at" }[req.query.sort] ?? "created_at"; // allow-list!
+const [rows, count] = await Promise.all([
+  pool.query(`SELECT id, title, price FROM retreats WHERE city = $1 ORDER BY ${sortCol} LIMIT $2 OFFSET $3`,
+             [req.query.city, limit, (page - 1) * limit]),
+  pool.query("SELECT COUNT(*) FROM retreats WHERE city = $1", [req.query.city]),
+]);
+res.json({ items: rows.rows, page, totalPages: Math.ceil(count.rows[0].count / limit) });
+```
+
+:::say
+- I read **page, limit, filters and sort** from the query string.
+- I **cap the limit** to protect the server, and always **scope the query to the logged-in user** when data is private.
+- **Sort columns come from an allow-list**, never straight from the user, because column names can't be parameterized.
+- I run the **data query and the count in parallel** with `Promise.all`.
+- For very large tables, `OFFSET` gets slow, so I'd switch to **cursor-based pagination** using the last item's ID or date.
+:::
+
+## Authentication & security
+
+### How does JWT authentication work? {mid}
+
+:::quick
+**On login, check the password with bcrypt and sign a JWT (user ID, role, expiry). The client sends it with every request; middleware verifies it and sets `req.user`.**
+**Why it matters:** the token can't be changed without the secret, but anyone can read it, so no secrets inside.
+:::
+
+**📖 Explanation**
+
+```mermaid
+sequenceDiagram
+  participant C as Client
+  participant API as Express API
+  participant DB as Database
+  C->>API: POST /login (email, password)
+  API->>DB: find user
+  API->>API: bcrypt.compare(password, hash)
+  API-->>C: JWT (signed: userId, role, exp)
+  C->>API: GET /api/classes + token
+  API->>API: jwt.verify(token, secret) → req.user
+  API-->>C: 200 data (or 401 if invalid/expired)
+```
+
+A JWT has 3 parts: **header.payload.signature**. The payload is **readable** (Base64), but can't be changed without breaking the signature.
+
+:::say
+- On **login**, I verify the password with **bcrypt**.
+- Then I **sign a JWT** containing the **user ID, role and an expiry**, using a **server secret**.
+- The client sends it with **each request**; an **auth middleware verifies** the signature and expiry and attaches **`req.user`**.
+- Because it's **signed**, it **can't be tampered with**.
+- But the payload is only **encoded, not encrypted**, so I **never put sensitive data** in it.
+:::
+
+:::tip
+- "Where do you store the token?" → "Ideally in an HttpOnly, Secure, SameSite cookie, so JavaScript can't read it (XSS protection)."
+- "How do you log out or revoke a JWT?" → "Short-lived access tokens plus a refresh token stored server-side that can be revoked; or a token denylist."
+:::
+
+:::ts
+Add `user` to Express's `Request` type with declaration merging. See [1b · req.user](01b-typescript.html#how-do-you-add-req-user-in-typescript-after-auth-middleware).
+:::
+
+### Access token vs refresh token? {adv}
+
+:::quick
+**Access token: short-lived (~15 min), sent with every request. Refresh token: long-lived, in an HttpOnly cookie and stored on the server, used only to get a new access token.**
+**Why it matters:** a leaked access token expires fast, and you can log a user out everywhere.
+:::
+
+:::say
+- The **access token** is **short-lived**, say 15 minutes, and sent with **every request**.
+- The **refresh token** is **long-lived**, stored in an **HttpOnly cookie and on the server**, and only used to **get a new access token**.
+- If an access token **leaks**, it **expires quickly**.
+- I can **log a user out everywhere** by **revoking** their refresh token.
+- I'd **rotate** the refresh token on every use to detect theft.
+:::
+
+### Sessions vs JWT? {mid}
+
+:::quick
+**Sessions: the server stores the state (easy to revoke, needs a shared store to scale). JWT: stateless (scales easily, harder to revoke).**
+**Why it matters:** there's no single right answer; explain the trade-off.
+:::
+
+**📖 Explanation**
+
+| | Sessions | JWT |
+|---|---|---|
+| State | Server stores session (memory/Redis) | Stateless: data inside the token |
+| Revoke | Easy (delete session) | Harder (needs short expiry or denylist) |
+| Scaling | Needs shared store (Redis) | Easy across servers |
+| Typical use | Traditional web apps | SPAs, mobile apps, APIs |
+
+:::say
+- With **sessions**, the **server keeps the data**, and the client holds only a **session ID cookie**.
+- Sessions are **easy to revoke** but need a **shared store** like Redis when scaling.
+- **JWTs** are **stateless** and scale easily across servers and mobile clients, but **revoking them is harder**, so I keep them **short-lived**.
+- For a **React SPA plus API**, a **JWT in an HttpOnly cookie** is a good balance.
+:::
+
+### How do you store passwords safely? {basic}
+
+:::quick
+**Never store passwords, only bcrypt hashes (salted and deliberately slow). Compare with `bcrypt.compare`, and never return the hash.**
+**Why it matters:** if the database leaks, the passwords are still protected.
+:::
+
+**📖 Explanation**
+
+```js
+const hash = await bcrypt.hash(password, 12);     // salt is generated + stored inside the hash
+const ok = await bcrypt.compare(input, user.passwordHash);
+```
+
+:::say
+- I **never store passwords**, only **hashes**.
+- **bcrypt** adds a **random salt**, so identical passwords produce **different hashes**.
+- It's **deliberately slow**, with a cost factor like 12, which makes brute-forcing expensive.
+- On login I use **`bcrypt.compare`**.
+- I **never return the hash** in API responses: I exclude it from `SELECT` queries (or `select: false` in Mongoose).
+:::
+
+### How do you implement role-based access control (RBAC)? {mid}
+
+:::quick
+**After auth sets `req.user`, a `requireRole("admin")` middleware returns 403 if the role isn't allowed. Also check ownership: users only touch their own data.**
+**Why it matters:** forgetting ownership checks is a very common real security bug.
+:::
+
+**📖 Explanation**
+
+```js
+const requireRole = (...roles) => (req, res, next) =>
+  roles.includes(req.user.role) ? next() : res.status(403).json({ message: "Forbidden" });
+
+router.get("/admin/reports", auth, requireRole("admin"), getReports);
+router.post("/bookings", auth, requireRole("school", "admin"), createBooking);
+```
+
+:::say
+- After **authentication** puts the user on **`req.user`**, a **`requireRole`** middleware checks whether the role is allowed, and returns **403** if not.
+- It's a **curried function**, so I can write `requireRole('admin')` directly in the route.
+- In **VTMS** this separates **teacher, school and admin** capabilities.
+- I also check **ownership**: a school can only see **its own bookings**.
+:::
+
+:::warn
+Forgetting **ownership** checks: role alone isn't enough. A user with the right role still mustn't read *another* user's data. In SQL: `WHERE id = $1 AND user_id = $2`.
+:::
+
+:::ts
+Type roles as a union, `type Role = "admin" | "host" | "guest"`, and write `requireRole(...roles: Role[])`, so a typo like `requireRole("admn")` is a compile error.
+:::
+
+### What is CORS, and how do you configure it? {basic}
+
+:::quick
+**Browsers block calls to a different origin unless the server allows it with CORS headers. Configure an explicit allow-list of your frontend domains.**
+**Why it matters:** CORS protects users in the browser; it doesn't protect your API from Postman. Auth does that.
+:::
+
+**📖 Explanation**
+
+For "non-simple" requests, the browser first sends a **preflight** `OPTIONS` request.
+
+```mermaid
+sequenceDiagram
+  participant B as Browser (app.vercel.app)
+  participant S as API (api.onrender.com)
+  B->>S: OPTIONS /api/tasks (preflight)
+  S-->>B: Access-Control-Allow-Origin: https://app.vercel.app
+  B->>S: actual GET/POST request
+  S-->>B: data
+```
+
+```js
+app.use(cors({ origin: ["https://task-flow-client-roan.vercel.app"], credentials: true }));
+```
+
+:::say
+- **CORS** is a **browser security rule**: a page can't call an API on a **different origin** unless the API sends headers allowing it.
+- For complex requests, the browser sends a **preflight OPTIONS** request first.
+- I configure the **`cors`** middleware with an **explicit allow-list** of my frontend domains, **never `*` with cookies**, and **`credentials: true`** when using cookies.
+- CORS **doesn't protect the API** from tools like Postman; that's the job of **authentication**.
+:::
+
+### How do you secure an Express API? (checklist) {mid}
+
+:::quick
+**Helmet, rate limiting, schema validation, parameterized queries, bcrypt, short-lived tokens in HttpOnly cookies, strict CORS, secrets in env, HTTPS.**
+**Why it matters:** security is layers; no single tool is enough.
+:::
+
+**📖 Explanation**
+
+| Risk | Protection |
+|---|---|
+| Common header attacks | `helmet()` |
+| Brute force / abuse | `express-rate-limit` (TaskFlow: 300 requests / 15 min) |
+| SQL injection | **Parameterized queries** (`$1`, `$2`), never string concatenation |
+| NoSQL injection (`{"$gt": ""}`) | Validate input with a schema; `express-mongo-sanitize` |
+| XSS | Escape output, sanitise HTML, CSP via Helmet, HttpOnly cookies |
+| Leaked secrets | Environment variables, never in Git |
+| Mass assignment | Only accept whitelisted fields (schema validation) |
+| Data exposure | Never return password hashes or internal fields |
+| Transport | HTTPS everywhere |
+
+:::say
+- I **layer** the security.
+- **Helmet** for security headers and **rate limiting** for abuse.
+- **Schema validation** on every input, and **parameterized queries** to stop SQL injection.
+- **bcrypt** for passwords, **short-lived tokens in HttpOnly cookies**, a strict **CORS allow-list**.
+- **Secrets in environment variables**, **HTTPS**, and I **never send sensitive fields** like password hashes to the client.
+:::
+
+### How do you handle file uploads? {mid}
+
+:::quick
+**Multer receives the file; validate type and size; upload to cloud storage (Cloudinary/S3) and save only the URL in the database. For big files, use signed direct uploads.**
+**Why it matters:** retreat photos are a core part of a marketplace listing.
+:::
+
+:::say
+- I use **Multer** to receive **multipart form data**.
+- I **validate the file type and size**.
+- Then I upload it to **cloud storage**, like **Cloudinary in VTMS**, and save **only the returned URL** in the database, not the file.
+- For **large files**, the client uploads **directly to cloud storage with a signed URL**, so the file never passes through my server.
+:::
+
+## Real-time, performance & production
+
+### WebSockets vs polling vs Server-Sent Events? {mid}
+
+:::quick
+**Polling = client asks repeatedly. SSE = server pushes one way. WebSockets / Socket.io = two-way, persistent, real-time.**
+**Why it matters:** pick the simplest tool that fits: notifications ≠ chat.
+:::
+
+**📖 Explanation**
+
+| | Direction | Use for |
+|---|---|---|
+| Polling | Client asks repeatedly | Simple, infrequent updates |
+| SSE | Server → client only | Live feeds, notifications |
+| WebSocket / Socket.io | Both ways, persistent | Chat, live collaboration |
+
+:::say
+- **Polling** asks the server every few seconds: **simple but wasteful**.
+- **Server-Sent Events** keep one connection open so the **server pushes updates one way**, good for notifications.
+- **WebSockets** give **full two-way real-time** communication.
+- I used **Socket.io** for my **chat app**, with **rooms per conversation** and **JWT verification during the connection handshake**.
+:::
+
+### How do you improve API performance? {adv}
+
+:::quick
+**Measure first, then: database (indexes, select only needed columns, avoid N+1), caching, parallel calls, pagination and compression, background jobs.**
+**Why it matters:** most slow APIs are slow because of the database.
+:::
+
+**📖 Explanation**
+
+```mermaid
+flowchart LR
+  A["Slow endpoint"] --> M["Measure: logs, timing, EXPLAIN ANALYZE"]
+  M --> D["DB: indexes, select only needed columns, joins, avoid N+1"]
+  M --> C["Caching: Redis / in-memory for hot reads"]
+  M --> P["Parallel: Promise.all for independent calls"]
+  M --> Z["Payload: pagination, compression (gzip)"]
+  M --> B["Background jobs for slow work (emails, reports)"]
+```
+
+:::say
+- I **measure first**: log response times and check queries with **`EXPLAIN ANALYZE`** (or `explain()` in MongoDB).
+- Most wins are in the **database**: the **right indexes**, selecting **only needed columns**, avoiding **N+1** queries, and letting SQL do the grouping.
+- Then **caching hot data** in Redis, running **independent calls in parallel**, and **paginating and compressing** responses.
+- Slow tasks like **emails** go to **background jobs**, so the user isn't kept waiting.
+- At **Snowa**, optimising **aggregation pipelines and compound indexes** made a clear difference to dashboard load times.
+:::
+
+### What is the N+1 query problem? {mid}
+
+:::quick
+**One query for a list, then one more query per item: 100 items = 101 queries. Fix it by fetching related data in one go (JOIN, `$in`, `populate`).**
+**Why it matters:** the most common cause of a slow list endpoint.
+:::
+
+**📖 Explanation**
+
+```js
+// ❌ N+1: one query for bookings, then one per booking for its retreat
+const { rows: bookings } = await pool.query("SELECT * FROM bookings WHERE user_id = $1", [userId]);
+for (const b of bookings) b.retreat = (await pool.query("SELECT * FROM retreats WHERE id = $1", [b.retreat_id])).rows[0];
+
+// ✅ 1 query with a JOIN
+const { rows } = await pool.query(
+  `SELECT b.id, b.guests, r.title, r.city
+     FROM bookings b JOIN retreats r ON r.id = b.retreat_id
+    WHERE b.user_id = $1`, [userId]);
+```
+
+:::say
+- **N+1** is when you run **one query for a list** and then **one extra query for each item**, so 100 items means **101 queries**.
+- The fix is to fetch related data **in one go**.
+- In SQL that's a **JOIN**; in MongoDB, **`populate`**, a **`$lookup`**, or one **`$in`** query with all the IDs.
+:::
+
+### How do you prevent double booking (race conditions) in an API? {adv}
+
+:::quick
+**Do the check and the write in one database transaction with a row lock (`SELECT … FOR UPDATE`), or let a constraint reject the conflict. Never "check in JavaScript, then insert".**
+**Why it matters:** in a booking marketplace, two people grabbing the last spot at the same moment is a real bug.
+:::
+
+**📖 Explanation**
+
+```mermaid
+sequenceDiagram
+  participant A as User A
+  participant B as User B
+  participant DB as PostgreSQL
+  A->>DB: BEGIN, SELECT seats_left … FOR UPDATE (locks row)
+  B->>DB: BEGIN, SELECT … FOR UPDATE (waits ⏳)
+  A->>DB: seats_left is 1 → INSERT booking, set 0, COMMIT
+  DB-->>B: lock released → sees 0 seats → ROLLBACK, 409 Sold out
+```
+
+```js
+const client = await pool.connect();
+try {
+  await client.query("BEGIN");
+  const { rows } = await client.query(
+    "SELECT seats_left FROM retreat_dates WHERE id = $1 FOR UPDATE", [dateId]);
+  if (rows[0].seats_left < guests) { await client.query("ROLLBACK"); return res.status(409).json({ message: "Not enough seats" }); }
+  await client.query("UPDATE retreat_dates SET seats_left = seats_left - $1 WHERE id = $2", [guests, dateId]);
+  await client.query("INSERT INTO bookings (date_id, user_id, guests) VALUES ($1, $2, $3)", [dateId, userId, guests]);
+  await client.query("COMMIT");
+} catch (e) { await client.query("ROLLBACK"); throw e; }
+finally { client.release(); }
+```
+
+:::say
+- If I **check seats in JavaScript and then insert**, two requests can both pass the check at the same moment: a **race condition**.
+- So I do the **check and the write in one transaction**.
+- **`SELECT … FOR UPDATE`** **locks the row**, so the second request **waits** until the first commits, then sees the updated count.
+- If there aren't enough seats, I **roll back** and return **409 Conflict**.
+- Alternatives: a single **conditional `UPDATE … WHERE seats_left >= $1`**, or a **unique constraint**, so the database itself rejects the conflict.
+:::
+
+### How do you receive webhooks safely (for example, payments)? {mid}
+
+:::quick
+**Verify the signature with the shared secret (using the raw body), respond 200 quickly, make processing idempotent, and do slow work in the background.**
+**Why it matters:** payment confirmations usually arrive as webhooks; fake or repeated calls must not confirm bookings.
+:::
+
+**📖 Explanation**
+
+```js
+app.post("/webhooks/payments", express.raw({ type: "application/json" }), async (req, res) => {
+  const expected = crypto.createHmac("sha256", process.env.WEBHOOK_SECRET).update(req.body).digest("hex");
+  if (!crypto.timingSafeEqual(Buffer.from(expected), Buffer.from(req.get("x-signature") || "")))
+    return res.status(400).send("Bad signature");
+  const event = JSON.parse(req.body);
+  await pool.query(
+    "INSERT INTO payment_events (event_id, payload) VALUES ($1, $2) ON CONFLICT (event_id) DO NOTHING",
+    [event.id, event]);        // the same event twice is ignored
+  res.sendStatus(200);         // answer fast; process the event in the background
+});
+```
+
+:::say
+- A webhook is the **provider calling my server** when something happens, like a payment succeeding.
+- First I **verify the signature** with the shared secret, using the **raw request body**, so fake calls are rejected.
+- Providers **retry**, so processing must be **idempotent**: I store the **event ID with a unique constraint** and ignore duplicates.
+- I **respond 200 quickly** and do slow work, like emails, in the **background**.
+- I'd never confirm a booking from the frontend alone; the **server-verified payment** decides.
+:::
+
+### How do you make a Node app production-ready? {mid}
+
+:::quick
+**Validated env config, structured logging, central error handling, a `/health` endpoint, graceful shutdown, auto-restart, security middleware, and CI tests before deploy.**
+**Why it matters:** for a startup without a DevOps team, you are the one who ships it.
+:::
+
+:::say
+- **Environment-based config** with **validated secrets**.
+- **Structured logging** with request IDs, using something like **pino or winston**, and **centralised error handling**.
+- A **`/health` endpoint** for the host's health checks.
+- **Graceful shutdown**: on SIGTERM, finish in-flight requests and **close the database pool**.
+- A **process manager** or the host's **auto-restart**, plus **security middleware**.
+- **CI that runs tests before deploying**; my APIs **auto-deploy to Render from GitHub**.
+:::
+
+### How do you test Express APIs? {mid}
+
+:::quick
+**Unit-test services with Jest/Vitest; integration-test endpoints with Supertest against the exported app and a separate test database.**
+**Why it matters:** testing is a "good to have" for the Kochi role, and permission tests catch real bugs.
+:::
+
+**📖 Explanation**
+
+```js
+const request = require("supertest");
+const app = require("../src/app");
+test("teacher cannot access admin reports", async () => {
+  const res = await request(app).get("/api/admin/reports").set("Authorization", `Bearer ${teacherToken}`);
+  expect(res.status).toBe(403);
+});
+```
+
+:::say
+- I **unit-test business logic** in services with **Jest or Vitest**, for example the matching score.
+- I **integration-test endpoints** with **Supertest** against the exported Express app.
+- I use a **separate test database**, never the live one.
+- I prioritise **permission tests** (a teacher gets 403 on admin routes), **validation errors**, and the main **happy paths**.
+- **Digital Classroom** has **80+ automated tests** covering cases like duplicate uploads.
+:::
+
+## Practice problems
+
+### Practice 1: Build Express's middleware runner {adv}
+
+`runMiddleware(fns, req)` calls each `(req, next)` in order. A function can stop the chain by not calling `next`. Return the final `req`.
+
+:::practice
+```js starter
+function runMiddleware(fns, req) {
+  // your code here
+}
+```
+```js tests
+const log = [];
+const a = (req, next) => { log.push("a"); req.user = "vinay"; next(); };
+const b = (req, next) => { log.push("b"); next(); };
+const stop = (req, next) => { log.push("stop"); req.blocked = true; };
+const c = (req, next) => { log.push("c"); next(); };
+const r1 = runMiddleware([a, b, c], {});
+check(log, ["a", "b", "c"], "runs in order");
+check(r1.user, "vinay", "can modify req");
+log.length = 0;
+const r2 = runMiddleware([a, stop, c], {});
+check(log, ["a", "stop"], "stops when next() isn't called");
+check(r2.blocked, true, "req from the stopped chain");
+```
+:::
+
+:::hint
+Keep an `index`. Write a function `next()` that takes `fns[index++]` and calls it with `(req, next)`.
+:::
+
+:::hint
+Start the chain by calling `next()` once, then return `req`. If `index` reaches the end, `next` simply does nothing.
+:::
+
+:::solution
+```js
+function runMiddleware(fns, req) {
+  let i = 0;
+  function next() {
+    const fn = fns[i++];
+    if (fn) fn(req, next);
+  }
+  next();
+  return req;
+}
+```
+**Explain it:** this is exactly how Express works. Each middleware receives `next`, a closure over the index; not calling it ends the chain, which is how auth middleware returns 401.
+:::
+
+### Practice 2: Fixed-window rate limiter {mid}
+
+`createLimiter(max, windowMs, now)` returns `allow(ip)`, which returns `true` if that IP has made fewer than `max` requests in the current window. `now()` returns the current time (injected so it's testable).
+
+:::practice
+```js starter
+function createLimiter(max, windowMs, now) {
+  // your code here
+}
+```
+```js tests
+let t = 0;
+const allow = createLimiter(3, 1000, () => t);
+check([allow("a"), allow("a"), allow("a"), allow("a")], [true, true, true, false], "4th request in window blocked");
+check(allow("b"), true, "other IPs are independent");
+t = 1000;
+check(allow("a"), true, "new window resets the count");
+```
+:::
+
+:::hint
+Store, per IP, `{ count, windowStart }` in a `Map`.
+:::
+
+:::hint
+If `now() - windowStart >= windowMs`, reset `count` to 0 and `windowStart` to now. Then increment and compare with `max`.
+:::
+
+:::solution
+```js
+function createLimiter(max, windowMs, now) {
+  const hits = new Map();
+  return function allow(ip) {
+    const t = now();
+    let rec = hits.get(ip);
+    if (!rec || t - rec.windowStart >= windowMs) rec = { count: 0, windowStart: t };
+    rec.count++;
+    hits.set(ip, rec);
+    return rec.count <= max;
+  };
+}
+```
+**Explain it:** this is how `express-rate-limit` works by default. **Follow-up:** "Multiple servers?" Store the counters in Redis so all instances share them.
+:::
+
+### Practice 3: Parse a query string {basic}
+
+`parseQuery("?subject=maths&page=2&lang=te&lang=en")` → `{ subject: "maths", page: "2", lang: ["te", "en"] }`. Decode `%20` and similar.
+
+:::practice
+```js starter
+function parseQuery(qs) {
+  // your code here
+}
+```
+```js tests
+check(parseQuery("?subject=maths&page=2"), { subject: "maths", page: "2" }, "basic pairs");
+check(parseQuery("lang=te&lang=en"), { lang: ["te", "en"] }, "repeated keys become an array");
+check(parseQuery("?name=Vinay%20S"), { name: "Vinay S" }, "decodes values");
+check(parseQuery(""), {}, "empty string");
+```
+:::
+
+:::hint
+Remove a leading `?`, split on `&`, then split each part on the first `=`. Skip empty parts.
+:::
+
+:::hint
+Use `decodeURIComponent`. If the key already exists, turn the value into an array (or push onto it).
+:::
+
+:::solution
+```js
+function parseQuery(qs) {
+  const out = {};
+  for (const part of qs.replace(/^\?/, "").split("&")) {
+    if (!part) continue;
+    const [k, v = ""] = part.split("=");
+    const key = decodeURIComponent(k), val = decodeURIComponent(v);
+    if (key in out) out[key] = [].concat(out[key], val);
+    else out[key] = val;
+  }
+  return out;
+}
+```
+**Explain it:** Express does this for you into `req.query`. That's also why `req.query.x` can unexpectedly be an **array**, so always validate types.
+:::
+
+### Practice 4: Build an EventEmitter {mid}
+
+Implement `on`, `off` and `emit`. `emit` returns `true` if there were listeners.
+
+:::practice
+```js starter
+class Emitter {
+  // your code here
+}
+```
+```js tests
+const e = new Emitter(); const got = [];
+const h = (x) => got.push("h:" + x);
+e.on("booked", h); e.on("booked", (x) => got.push("g:" + x));
+check(e.emit("booked", 7), true, "emit with listeners returns true");
+check(got, ["h:7", "g:7"], "all listeners called in order with args");
+e.off("booked", h); got.length = 0; e.emit("booked", 8);
+check(got, ["g:8"], "off removes a listener");
+check(e.emit("nobody"), false, "no listeners returns false");
+```
+:::
+
+:::hint
+Store `this.events = {}`, mapping each event name to an array of functions.
+:::
+
+:::hint
+`emit(name, ...args)`: copy the array, call each with `...args`, and return whether there were any.
+:::
+
+:::solution
+```js
+class Emitter {
+  constructor() { this.events = {}; }
+  on(name, fn) { (this.events[name] ??= []).push(fn); return this; }
+  off(name, fn) { this.events[name] = (this.events[name] || []).filter((f) => f !== fn); return this; }
+  emit(name, ...args) {
+    const list = [...(this.events[name] || [])];
+    list.forEach((fn) => fn(...args));
+    return list.length > 0;
+  }
+}
+```
+**Explain it:** the observer pattern. Copying the list before calling protects against listeners removing themselves mid-loop.
+:::
+
+### Practice 5: Retry with exponential backoff {adv}
+
+`retry(fn, attempts, baseMs)` calls the async `fn`; if it fails, it waits `baseMs`, then `baseMs*2`, `baseMs*4`… and tries again, up to `attempts` total. It rethrows the last error.
+
+:::practice
+```js starter
+async function retry(fn, attempts, baseMs) {
+  // your code here
+}
+```
+```js tests
+let n = 0;
+const flaky = async () => { n++; if (n < 3) throw new Error("network"); return "ok"; };
+check(await retry(flaky, 5, 5), "ok", "succeeds on the 3rd try");
+check(n, 3, "called exactly 3 times");
+let m = 0, msg = "";
+try { await retry(async () => { m++; throw new Error("down"); }, 3, 5); } catch (e) { msg = e.message; }
+check([m, msg], [3, "down"], "gives up after 3 attempts and rethrows");
+```
+:::
+
+:::hint
+Loop from `i = 0` to `attempts - 1`. `try { return await fn(); } catch (e) { lastError = e; }`.
+:::
+
+:::hint
+After a failure (except the last), wait: `await new Promise(r => setTimeout(r, baseMs * 2 ** i))`.
+:::
+
+:::solution
+```js
+async function retry(fn, attempts, baseMs) {
+  let lastError;
+  for (let i = 0; i < attempts; i++) {
+    try { return await fn(); }
+    catch (e) {
+      lastError = e;
+      if (i < attempts - 1) await new Promise((r) => setTimeout(r, baseMs * 2 ** i));
+    }
+  }
+  throw lastError;
+}
+```
+**Explain it:** backoff avoids hammering a struggling server. It's what the classroom box does when an upload fails. **Follow-up:** add random "jitter" so many clients don't retry at the same moment, and only retry **idempotent** operations.
+:::
+</script>
+<script src="assets/viewer.js?v=8"></script>
+</body>
+</html>
