@@ -1,0 +1,676 @@
+# 9 · My projects ⭐
+
+This is **the most important document**. At 3+ years, interviewers spend 30–50% of the technical round on *your* work, and a founding team (like the Kochi role) cares about it even more. Know these stories so well you could tell them half-asleep.
+
+:::note
+**How to read each card:** ⚡ **Quick answer** = your 10-second version → 📖 **Explanation** and diagrams → 🎤 **Interview answer** = the full story, point by point. Say each story **out loud**, in about 2 minutes, then stop and let them ask.
+:::
+
+:::warn
+**Only say what's true.** Where a card says *"Adapt this"*, check the detail against your actual code before the interview. If you're asked about something you didn't build, say *"I didn't need that at this scale, but I'd do it like this…"*. That's a strong answer, not a weak one.
+:::
+
+## How to present any project
+
+### What is the 5-step project story? {basic}
+
+:::quick
+**Problem → My idea → Architecture → Key decisions → Result. About 2 minutes, then stop.**
+**Why it matters:** leading with the problem makes you memorable; leading with the tech stack makes you sound like everyone else.
+:::
+
+**📖 Explanation**
+
+```mermaid
+flowchart LR
+  P["1 · Problem<br/>who suffered, why"] --> I["2 · My idea<br/>the one-line solution"] --> A["3 · Architecture<br/>3 boxes on a whiteboard"] --> D["4 · Key decisions<br/>2 trade-offs I made"] --> R["5 · Result<br/>status, numbers, learning"]
+```
+
+**Numbers you can always quote:**
+
+| Project | Numbers |
+|---|---|
+| VTMS | 590 classrooms · 100-point matching · reminders 1 day + 1 hour before · 69 tests · pilot in December |
+| Digital Classroom | 590 classrooms · 64 schools · 4 weeks idea to pilot · 12 releases · 80+ tests · ~70 bytes per record |
+
+:::say
+- I **lead with the problem**, not the tech stack: "classes were being missed" is more memorable than "I used React and MongoDB".
+- Then **my idea** in one line, the **architecture** as three boxes, and **two decisions** with their trade-offs.
+- I finish with the **result**: status, numbers and what I learned.
+- I say **"I"** for what I did; I was the sole developer, so I own it.
+:::
+
+### Which project should you lead with for the Kochi role? {basic}
+
+:::quick
+**Digital Classroom Monitoring: Node.js + PostgreSQL, idea to pilot in 4 weeks, AI-assisted with you owning the decisions, 80+ tests.**
+**Why it matters:** it matches three of their must-haves (PostgreSQL, own features end to end, AI tools) in one story.
+:::
+
+**📖 Explanation**
+
+| Kochi job asks for | Your proof |
+|---|---|
+| Own features end to end | DCM: idea → requirements → design → build → real-device testing → pilot |
+| Node.js + PostgreSQL | DCM API: Node.js + PostgreSQL (Neon), exactly-once saves |
+| React | VTMS (React 19), TaskFlow, Snowa dashboard |
+| Use AI tools daily | DCM built with AI writing code; you decided, tested, approved |
+| Think, ask questions, make trade-offs | The "what does used mean?" rules; the one-year storage decision |
+| Testing (good to have) | 80+ tests (DCM), 69 tests (VTMS) |
+| DevOps (good to have) | Render, Neon, Vercel deployments; test vs live databases |
+
+:::say
+- For this role I'd lead with **Digital Classroom Monitoring**.
+- It's **Node.js and PostgreSQL**, which is their backend stack.
+- I **owned it end to end**: from the question "are classrooms actually used?" to a working pilot in **four weeks**.
+- I built it **with AI tools**, while I owned the requirements, design, testing and approvals, which is exactly how they say they work.
+- Then I'd mention **VTMS** for the **React** side and the **matching and scheduling** logic.
+:::
+
+:::warn
+**About TypeScript:** your projects are mainly JavaScript. Don't claim they're written in TypeScript unless they are. Say: *"My projects are mostly JavaScript; I use TypeScript in newer work and I'm comfortable with it."* (See [1b · TypeScript](01b-typescript.html).)
+:::
+
+## VTMS: Virtual Teachers Management System
+
+### Walk me through VTMS. (2-minute story) {basic}
+
+:::quick
+**A MERN platform that matches volunteer teachers worldwide to rural classrooms: 100-point matching, time-zone-safe scheduling, reminders, three dashboards.**
+**Why it matters:** your best React + Node + product-thinking story.
+:::
+
+**📖 Explanation**
+
+| Step | VTMS |
+|---|---|
+| Problem | 590 smart classrooms, but no subject teachers; volunteers abroad couldn't reach schools; spreadsheets, missed classes |
+| Idea | One platform that matches the right volunteer to the right class at the right time |
+| Architecture | React → Express API → MongoDB; three dashboards (teacher, school, admin) |
+| Decisions | 100-point matching; store times in UTC; reminders + check-ins |
+| Result | RBAC, audit log, 69 tests; pilot in December |
+
+:::say
+- **Problem:** Swashodhan Trust runs **590 smart classrooms** in rural Telangana, but many schools **don't have subject teachers**. Volunteers abroad wanted to teach but had **no way to reach** these schools. It all ran on **spreadsheets and phone calls**, and classes were missed because of **time-zone mix-ups and no reminders**.
+- **Idea:** **one platform** that matches the right volunteer to the right classroom at the right time.
+- **What I built:** a MERN app with **three dashboards**: teacher, school and Trust admin. A school requests a teacher, VTMS **ranks volunteers with a 100-point score** (subject, language, time slot, day, class level, weekly capacity), and the school picks one. The teacher accepts a **single class or a whole series**.
+- **Hardest parts:** **time zones** (9:30 pm in Los Angeles is 10 am the next day in India) and making sure **classes actually happen**: reminders **1 day and 1 hour before**, plus check-ins and attendance.
+- **Result:** role-based access, an **audit log** and **69 automated tests**; we **pilot in December**.
+:::
+
+### Draw the VTMS architecture. {mid}
+
+:::quick
+**React 19 (Vercel) → Express REST API (Render) → MongoDB Atlas, plus Cloudinary for images and Nodemailer for emails.**
+**Why it matters:** be ready to draw three boxes on a whiteboard in under a minute.
+:::
+
+**📖 Explanation**
+
+```mermaid
+flowchart LR
+  subgraph Users
+    T["👩‍🏫 Teacher"]
+    S["🏫 School"]
+    A["🛡️ Trust admin"]
+  end
+  FE["React 19 + Vite + Tailwind<br/>(Vercel)"]
+  API["Node.js + Express REST API<br/>(Render)<br/>auth · RBAC · matching · scheduling"]
+  DB[("MongoDB Atlas")]
+  CL["Cloudinary<br/>(images)"]
+  M["Nodemailer<br/>(emails, reminders)"]
+  T & S & A --> FE --> API --> DB
+  API --> CL
+  API --> M
+```
+
+:::say
+- It's a classic **three-tier MERN** setup.
+- The **React frontend on Vercel** talks to an **Express REST API on Render**, which stores data in **MongoDB Atlas**.
+- The API handles **authentication**, **role-based access** for the three user types, the **matching engine** and **scheduling**.
+- **Cloudinary** stores uploaded images, and **Nodemailer** sends notifications and reminder emails.
+:::
+
+:::tip
+- "Why separate frontend and backend hosting?" → they deploy and scale independently; Vercel is optimised for static frontends while Render runs the long-lived Node server.
+- "Why MongoDB?" → see the card below.
+:::
+
+### How does the 100-point matching engine work? {mid}
+
+:::quick
+**Filter out teachers who can't take the class, score the rest out of 100 on six criteria, sort, and let the school choose.**
+**Why it matters:** shows algorithm design plus product judgement (the human makes the final call).
+:::
+
+**📖 Explanation**
+
+```mermaid
+flowchart TB
+  R["School request<br/>subject · language · class · day · time"] --> F["1 · Filter: hard rules<br/>(e.g. teacher available, has capacity left)"]
+  F --> SC["2 · Score each teacher (0–100)<br/>subject · language · time slot<br/>day · class level · capacity"]
+  SC --> SO["3 · Sort by score, highest first"] --> UI["4 · School picks from the ranked list"]
+```
+
+:::say
+- Each request has a **subject, language, class level, day and time slot**.
+- First I **filter out** teachers who can't possibly take it, for example with **no capacity left** that week.
+- Every remaining teacher gets **points for each matching criterion**, up to **100**.
+- The list is **sorted by score**, so the school sees the best matches first.
+- The **school still makes the final choice**, because people know things a score can't capture.
+:::
+
+:::note
+**Adapt this:** check the exact weights in your code (for example, subject vs language points) and which criteria are hard filters. A good answer to *"why those weights?"*: "Subject and language matter most, because a class fails without them; time and capacity decide whether it's actually possible."
+:::
+
+:::tip
+- "How would this scale to 10,000 teachers?" → filter in the database query first (indexes on subject, language, availability), score only the remaining candidates, and cache results per request.
+- "Why not machine learning?" → "With pilot-sized data, transparent rules are easier to explain to schools and to debug. ML could come later, once we have outcome data such as which matches led to completed classes."
+:::
+
+### How did you handle time zones? {mid}
+
+:::quick
+**Store one standard time (UTC) plus the user's time zone; convert only when displaying.**
+**Why it matters:** one time-zone bug means a classroom waits for a teacher who never comes.
+:::
+
+**📖 Explanation**
+
+```mermaid
+flowchart LR
+  T["Teacher picks<br/>Mon 9:30 pm (Los Angeles)"] --> UTC["Stored in DB as UTC<br/>Tue 04:30 UTC"] --> S["School sees<br/>Tue 10:00 am IST"]
+  UTC --> T2["Teacher sees<br/>Mon 9:30 pm PT"]
+```
+
+:::say
+- Every class time is **saved in UTC**, together with the **user's time zone**.
+- When I show a time, I **convert it to the viewer's own time zone**.
+- So a teacher in **Los Angeles** and a school in **India** see the **same class in their local times**.
+- **Reminders** are scheduled from the **UTC value**, so they fire at the right moment, even when **daylight saving** changes.
+:::
+
+:::note
+**Adapt this:** confirm which library or method you used (for example `Intl.DateTimeFormat`, date-fns-tz or Luxon) and where conversion happens (frontend vs backend).
+:::
+
+:::tip
+"What about daylight saving time?" → "Storing UTC plus an IANA zone name like `America/Los_Angeles` (not a fixed offset like −8) means DST is handled correctly by the date library."
+:::
+
+### How do reminders work (1 day and 1 hour before)? {mid}
+
+:::quick
+**Each booking gets two reminder times from its UTC start; a scheduled job sends due reminders and marks them "sent".**
+**Why it matters:** the "sent" flag means no duplicates, and a restart loses nothing.
+:::
+
+:::say
+- When a class is booked, it gets reminder times **1 day and 1 hour before**, calculated from its **UTC start time**.
+- A **scheduled job** checks regularly for reminders that are **due and not yet sent**.
+- It sends the **email and in-app notification**, then **marks them as sent**, so nothing goes out twice.
+- Because reminders live **in the database**, a **server restart** doesn't lose them.
+:::
+
+:::note
+**Adapt this:** say exactly how you schedule them in your code, for example a cron job (`node-cron`) or a queue. Mention the "sent" flag that prevents duplicates; it shows reliability thinking.
+:::
+
+### How did you secure VTMS? (RBAC, auth, audit log) {mid}
+
+:::quick
+**Auth middleware verifies the token → `requireRole` checks the role → handler runs → every change goes to an audit log.**
+**Why it matters:** a teacher can't call admin endpoints even if they guess the URL.
+:::
+
+**📖 Explanation**
+
+```mermaid
+flowchart LR
+  Req["Request + token"] --> Auth["auth middleware<br/>verify token → req.user"] --> Role["requireRole('admin')<br/>check req.user.role"] --> H["Route handler"]
+  H --> Log["Audit log<br/>who · what · when"]
+```
+
+:::say
+- Every protected route goes through an **auth middleware** that **verifies the token** and attaches the user.
+- A second middleware, **`requireRole`**, checks whether that **role is allowed**.
+- So a **teacher can't call admin endpoints**, even if they guess the URL.
+- **Sensitive settings are encrypted**, and every change goes to an **audit log**: who did it and when.
+- That matters for a Trust working with **schools and children's data**.
+:::
+
+:::tip
+"Where do you store the token?" → be honest about your implementation. The ideal answer: an **HttpOnly, Secure** cookie, so JavaScript can't read it (protects against XSS).
+:::
+
+### What do your 69 automated tests cover? {mid}
+
+:::quick
+**The risky parts: matching score, time-zone conversion, role-based access (403 checks) and the booking flow.**
+**Why it matters:** shows you test what breaks silently, not just UI snapshots.
+:::
+
+:::say
+- They focus on the parts where a bug would **hurt a real classroom**.
+- The **matching score**, **time-zone conversion**, **role-based access** (a teacher must get **403** on admin routes), and the **booking flow**.
+- I prioritised **business logic and permissions** over UI snapshots, because those **break silently**.
+:::
+
+:::note
+**Adapt this:** open your test folder and note the framework (Jest or Vitest, Supertest for APIs) and 3 concrete test names you can quote.
+:::
+
+### Why MongoDB for VTMS and not SQL? {mid}
+
+:::quick
+**Teacher profiles are flexible and nested (subjects, languages, weekly slots), which fit documents. For strict, related data, you chose PostgreSQL in Digital Classroom.**
+**Why it matters:** shows you choose the database by the shape of the data, not by habit.
+:::
+
+:::say
+- Teacher profiles have **flexible, nested data**: lists of subjects, languages and weekly availability slots.
+- Those fit **naturally as documents**.
+- I knew the **MERN stack well**, and **Atlas** made hosting simple.
+- For data with **strict relationships and exactly-once guarantees**, I chose **PostgreSQL** in Digital Classroom.
+- So I **pick the database based on the shape of the data**.
+:::
+
+### What was the hardest problem in VTMS, and what would you improve? {mid}
+
+:::quick
+**Hardest: time (time zones, recurring series, reminders). Next: automatic meeting links, a teacher mobile app, Telugu/Hindi, and tuning matching with real outcomes.**
+**Why it matters:** "what would you improve" shows product thinking beyond code.
+:::
+
+:::say
+- The **hardest part was time**: time zones, **recurring series** and reminders, because one bug means **children waiting for a teacher who never comes**.
+- I fixed that by **storing everything in UTC** and **testing the conversions heavily**.
+- To improve it, I'd add **automatic Zoom links**, a **mobile app for teachers**, and **Telugu and Hindi** for school staff.
+- Once the pilot gives real data, I'd use **outcomes** (completed classes, feedback scores) to **tune the matching weights**.
+:::
+
+## Digital Classroom Utilization Monitoring
+
+### Walk me through Digital Classroom Monitoring. (2-minute story) {basic}
+
+:::quick
+**590 classrooms couldn't prove they were used. You built an offline Android app on each TV box, a Node.js + PostgreSQL API that saves every record exactly once, and a dashboard, from idea to pilot in 4 weeks.**
+**Why it matters:** your strongest story for the Kochi role.
+:::
+
+**📖 Explanation**
+
+| Step | Digital Classroom |
+|---|---|
+| Problem | 590 classrooms, 64 schools; daily WhatsApp photos proved little; broken boxes unnoticed for weeks |
+| Idea | "What if each classroom could report for itself?" |
+| Architecture | Android app (offline) → Node.js API → PostgreSQL; Trust dashboard |
+| Decisions | >10 min = used; missing data ≠ zero; exactly-once uploads; one year of storage on the box |
+| Result | Online pilot in 4 weeks; 12 releases; 80+ tests; next: 2-school pilot |
+
+:::say
+- **Problem:** the Trust had installed **590 digital classrooms** across **64 schools**, but **couldn't tell if they were actually used**. Schools sent **WhatsApp photos** every day, which took teachers' time and **proved very little**, and a broken box could go **unnoticed for weeks**.
+- **My question:** what if **each classroom could report for itself**?
+- **What I built**, from idea to an **online pilot in four weeks**, has three parts:
+- An **Android app** on each classroom TV box records time in **approved learning apps**, **works offline**, and uploads at **noon and 6 pm**.
+- A **Node.js and PostgreSQL** server checks each device's key and stores **every record exactly once**.
+- A **dashboard** shows the Trust which classrooms **need help**, with **one-click Excel reports**.
+- **Rules I set:** more than **10 minutes** of learning apps counts as used, and **missing data is never counted as zero**.
+- **Result:** **12 tested releases** and **over 80 automated tests**; next is a **two-school pilot**.
+:::
+
+### Draw the Digital Classroom architecture. {mid}
+
+:::quick
+**Android app (SQLite, offline) → HTTPS + device key, twice a day → Node.js API → PostgreSQL (Neon) ← Trust dashboard.**
+**Why it matters:** shows offline-first design and a secure device-to-server flow.
+:::
+
+**📖 Explanation**
+
+```mermaid
+flowchart LR
+  subgraph Classroom["Each classroom (580+ boxes)"]
+    APP["T95 Monitor app<br/>Android · SQLite<br/>records app time offline"]
+  end
+  API["Node.js API (Render)<br/>device-key check · validation<br/>exactly-once save · daily rules"]
+  DB[("PostgreSQL (Neon)")]
+  DASH["Trust dashboard<br/>calendars · targets · online status<br/>pairing · Excel reports"]
+  APP -->|"HTTPS + device key<br/>noon & 6 pm uploads"| API --> DB
+  DASH --> API
+```
+
+:::say
+- Each classroom box runs an **Android app** that records learning-app usage into a **local SQLite database**, so nothing is lost when the internet drops.
+- **Twice a day** it uploads a batch over **HTTPS with its own device key**.
+- The **Node.js API** checks the key, **validates** the records and saves them in **PostgreSQL**, **ignoring duplicates**.
+- The **Trust dashboard** reads from the same API: calendars, online status and reports.
+:::
+
+### How did you guarantee "every record is saved exactly once"? {adv}
+
+:::quick
+**Each record has a unique key (device + sequence number), PostgreSQL has a unique constraint on it, and inserts use `ON CONFLICT DO NOTHING`, so a retried batch never doubles totals.**
+**Why it matters:** idempotency is a senior-level concept, and the same idea protects payments and bookings.
+:::
+
+**📖 Explanation**
+
+```mermaid
+sequenceDiagram
+  participant Dev as Classroom box
+  participant API as Node API
+  participant DB as PostgreSQL
+  Dev->>API: Upload batch (records 101 to 150)
+  API->>DB: INSERT … ON CONFLICT DO NOTHING
+  DB-->>API: saved
+  API--xDev: ❌ reply lost (network drop)
+  Dev->>API: Retry the same batch
+  API->>DB: INSERT … ON CONFLICT DO NOTHING
+  DB-->>API: duplicates ignored ✅
+  API-->>Dev: Confirmed, records 101 to 150 are safe
+  Note over Dev: deletes only confirmed records later
+```
+
+:::say
+- Rural internet is unreliable, so the box must be able to **resend safely**.
+- Every record has a **unique identity**: the **device plus its own record number**.
+- The database has a **unique constraint** on that, and the insert uses **"on conflict do nothing"**.
+- So if a reply is lost and the box **sends the same batch again**, the duplicates are **ignored** and totals **never double**.
+- The box only treats records as sent **after the server confirms** them.
+- This is called making the upload **idempotent**: doing it twice has the same effect as doing it once. For a **marketplace**, the same idea stops a **payment or booking being recorded twice**.
+:::
+
+:::note
+**Adapt this:** check the exact unique key in your schema (for example `device_id + sequence_number`), and mention that the whole batch is saved in one transaction ("all in one step").
+:::
+
+:::tip
+"Why not just check whether a record exists before inserting?" → "Check-then-insert has a race condition when two requests arrive together. A database unique constraint is atomic and always correct."
+:::
+
+### Why PostgreSQL here instead of MongoDB? {mid}
+
+:::quick
+**Very structured, related data (schools → classrooms → devices → events) with a hard no-duplicates rule. PostgreSQL enforces that with constraints and transactions.**
+**Why it matters:** "correctness rules live in the database" is a great line for a PostgreSQL role.
+:::
+
+:::say
+- This data is **very structured**: schools, classrooms, devices and usage events, with **clear relationships**.
+- There's a **hard requirement for no duplicates**.
+- PostgreSQL gives me **unique constraints, transactions and joins** for reports, out of the box.
+- So the **correctness rules live in the database itself**, not only in my code.
+- For VTMS's **flexible profile data**, MongoDB was the better fit.
+:::
+
+### What do "used" and "missing data" mean? Why do these rules matter? {mid}
+
+:::quick
+**Used = more than 10 minutes of approved learning apps in a day (counted up to the school's target). Missing data shows as "awaiting data", never zero.**
+**Why it matters:** your best "product decision" story: getting it wrong would unfairly blame schools.
+:::
+
+:::say
+- Defining **"used"** was the hardest decision, and it **wasn't technical**.
+- Only **approved learning apps** count, and only **time on screen**.
+- **More than 10 minutes** in a day marks the classroom as used, against a **120 to 180 minute target** per school.
+- Each day counts **only up to its target**, so one very long day can't hide several unused ones.
+- **Missing data is never counted as zero**: it shows as **"awaiting data"**, because a classroom with no internet isn't a classroom that wasn't used.
+:::
+
+:::proj
+This is a great answer to "Tell me about a time you made a product decision", and to the Kochi job's "think, ask the right questions, make trade-offs".
+:::
+
+### How does replacing a broken box keep the classroom's history? {mid}
+
+:::quick
+**The classroom and the device are separate. A one-time pairing code (valid 24 hours) links a new box; the old key is revoked; history stays with the classroom.**
+**Why it matters:** shows data modelling that matches the real world.
+:::
+
+:::say
+- I **separated the classroom from the device**.
+- Each classroom has a **permanent code**; each box has its **own ID and key**.
+- When a box fails, the admin generates a **one-time pairing code**, valid for **24 hours**, and types it on the new box.
+- The **old box's key is revoked** immediately.
+- All uploaded history **stays attached to the classroom**, not the hardware.
+:::
+
+### How did you decide to keep a year of records on the box? {mid}
+
+:::quick
+**Measured instead of guessed: ~70 bytes per record → ~56 MB a year, under 1% of free space. Keep a year; never delete unconfirmed records.**
+**Why it matters:** a data-driven decision, written up before changing the app.
+:::
+
+**📖 Explanation**
+
+| Measurement | Value |
+|---|---|
+| 30,885 real records | 2.1 MB (~70 bytes each) |
+| 6 hours a day | ~0.15 MB a day |
+| One year | ~56 MB (80 MB at most) |
+| Free space on the box | ~9.4 GB |
+
+:::say
+- Instead of guessing, **I measured**: 30,885 real records took **2.1 MB**, about **70 bytes each**.
+- A box running 6 hours a day creates about **0.15 MB a day**, so a year is roughly **56 MB**, **under 1%** of the free space.
+- So we **keep confirmed records for a year**, delete the oldest only if free space drops **below 1 GB**, and **never delete a record the server hasn't confirmed**.
+- I wrote it up as a **one-page decision note** before changing the app.
+:::
+
+### You built this with AI tools. What exactly did YOU do? {mid}
+
+:::quick
+**AI wrote much of the code and tests; you decided what to build, wrote the requirements, set the rules, tested every release on a real box and approved it.**
+**Why it matters:** the Kochi job wants AI tools as a core part of the workflow. Say this confidently.
+:::
+
+**📖 Explanation**
+
+| My part | The AI's part |
+|---|---|
+| Decide what to measure and why | Write the Android app, server and dashboard code |
+| Write requirements in plain words | Write and run 80+ automated tests |
+| Set rules: nothing goes live without approval; no plain-text PINs | Lay out options with trade-offs |
+| Install every release on a real box | |
+| Check results against the raw data | |
+
+:::say
+- I used **ChatGPT, Codex and later Claude Code** to write much of the code and the tests.
+- I was responsible for **everything around that**: deciding **what to measure and why**, and writing the **requirements in plain language**.
+- I set **rules**, like "nothing goes live without my approval" and "never store PINs in plain text".
+- I **installed every release on a real classroom box** and **checked results against the raw data** before approving it.
+- AI made me **faster**, but the **design, decisions and verification were mine**, and I can walk you through any part of the code.
+:::
+
+:::warn
+Don't sound defensive or say "AI did it all". Make sure you **can** explain the key code paths: the upload endpoint, the duplicate handling and the daily usage calculation. Read through them once before each interview.
+:::
+
+## TaskFlow (personal project)
+
+### Walk me through TaskFlow. {basic}
+
+:::quick
+**A full-stack task manager with productivity analytics (heatmaps, weekly charts, streaks), built with React + Redux Toolkit and Node + Express + MongoDB, with production touches like optimistic updates and rate limiting.**
+**Why it matters:** a live, clickable demo of your React and API skills.
+:::
+
+:::say
+- **TaskFlow** is a full-stack task manager I built to **go beyond basic CRUD**.
+- It adds **productivity analytics**: completion **heatmaps**, weekly charts, category breakdowns and **streaks**.
+- Frontend: **React, Redux Toolkit, Tailwind** and **Recharts**. Backend: **Node, Express and MongoDB**, with **Clerk** for authentication.
+- I focused on **production details**: **optimistic updates with rollback**, **rate limiting**, **Helmet**, restricted **CORS** and **compound indexes**.
+- It's **live on Vercel and Render**.
+:::
+
+### What are optimistic updates, and how did you roll back on failure? {mid}
+
+:::quick
+**Update the screen immediately, keep a copy of the old state, call the API, and restore the copy with an error message if it fails.**
+**Why it matters:** the app feels instant, and you handle the failure path properly.
+:::
+
+**📖 Explanation**
+
+```mermaid
+sequenceDiagram
+  participant U as User
+  participant UI as React/Redux
+  participant API as API
+  U->>UI: Tick task as done
+  UI->>UI: Update the screen immediately ✅
+  UI->>API: PATCH /tasks/:id
+  alt success
+    API-->>UI: 200 OK (keep the change)
+  else failure
+    API-->>UI: error
+    UI->>UI: Restore the previous state ↩️ + show an error
+  end
+```
+
+:::say
+- Instead of waiting for the server, the UI **updates immediately**, so the app feels instant.
+- Before changing it, I **keep a copy of the previous state**.
+- If the API call **fails**, I **restore that copy** and show an error.
+- It's a trade-off: **better perceived speed**, with a bit more code for failures.
+:::
+
+### Why compound indexes, rate limiting and Helmet in TaskFlow? {mid}
+
+:::quick
+**Compound index (user + date) for fast analytics queries; rate limit (300 requests / 15 min) against abuse; Helmet for security headers; CORS limited to your frontend.**
+**Why it matters:** shows you think about performance and security, not just features.
+:::
+
+:::say
+- Analytics queries filter by **user and date**, so a **compound index on user ID plus date** finds one user's tasks for a period **without scanning everything**.
+- **Rate limiting**, **300 requests per 15 minutes**, protects the API from **abuse and accidental loops**.
+- **Helmet** sets **security headers**, for example against clickjacking and content sniffing.
+- **CORS** only allows **my frontend's domain** to call the API.
+:::
+
+## Other projects and experience (short answers)
+
+### Real-time chat: how does Socket.io work? {mid}
+
+:::quick
+**Socket.io keeps a two-way WebSocket open; each chat is a room; messages are saved to MongoDB and emitted to the room; the JWT is verified in the handshake.**
+**Why it matters:** your real-time experience in one breath.
+:::
+
+**📖 Explanation**
+
+```mermaid
+flowchart LR
+  A["User A"] <-->|"WebSocket"| S["Socket.io server"] <-->|"WebSocket"| B["User B"]
+  S --> R["Rooms: one per chat"]
+  S --> DB[("MongoDB<br/>messages")]
+```
+
+:::say
+- HTTP is **request-response**, so the server can't push messages.
+- **Socket.io** keeps a **persistent two-way WebSocket** open.
+- Each chat is a **room**: the server **saves** a message to MongoDB and **emits** it to everyone in that room.
+- The **typing indicator** is just a lightweight "typing" event.
+- I secured it by **verifying the JWT during the handshake**.
+:::
+
+:::tip
+"How would you scale chat across multiple servers?" → "Use the Socket.io Redis adapter so servers share room events, with sticky sessions on the load balancer."
+:::
+
+### Snowa Technologies: what did you build there? {basic}
+
+:::quick
+**A complete full-stack dashboard application: 20+ responsive React/Redux/Material-UI pages, 15+ Node/Express APIs, and the MongoDB data layer (schema design, aggregation pipelines, indexes).**
+**Why it matters:** your professional team experience (Jul 2023 – Feb 2025).
+:::
+
+:::say
+- At **Snowa Technologies** (July 2023 to February 2025), I developed a **complete full-stack dashboard application**.
+- On the frontend, **20+ responsive pages** in **React, Redux and Material-UI**.
+- On the backend, **15+ REST API endpoints** in **Node and Express**, with **validation** and **centralised error handling**.
+- I owned the **MongoDB schema design**, and optimised **aggregation pipelines and compound indexes**, plus **lazy loading and code splitting** on the frontend.
+- That's where I learned to think about the **whole flow**, from the UI down to the database query.
+:::
+
+:::note
+**Adapt this:** have one concrete example ready: one specific dashboard page, what data it showed, and one bug or performance problem you fixed there. (These claims match your resume, so be ready to go one level deeper on any of them.)
+:::
+
+### Healthcare work: what did you do with OpenEMR and the new EMR? {basic}
+
+:::quick
+**Minor OpenEMR customisations for telemedicine workflows; now involved in the Trust's own early-stage EMR. Keep it short.**
+**Why it matters:** avoid overclaiming; steer back to shipped products.
+:::
+
+:::say
+- Earlier I made some **minor customisations to OpenEMR**, an open-source medical records system, to support **telemedicine workflows**.
+- Now the Trust is planning **its own EMR**, and I'm involved in that work.
+- It's **early-stage**, so I'd rather talk in detail about the **products I've already shipped**.
+:::
+
+:::warn
+Keep this answer short and modest. Don't claim clinic numbers or performance improvements here.
+:::
+
+## Cross-questions they'll ask about any project
+
+### What was your role? Did you work in a team? {basic}
+
+:::quick
+**Sole developer at the Trust (requirements to deployment); team member at Snowa with code reviews.**
+**Why it matters:** founders want both: independent ownership and team habits.
+:::
+
+:::say
+- At **Swashodhan** I'm the **sole developer**: I handle everything from **gathering requirements** with the programme staff to **design, coding, testing and deployment**.
+- That's made me comfortable **owning a product end to end** and **working independently**.
+- At **Snowa** I worked **within a team**, building dashboard pages and APIs, with **code reviews**.
+:::
+
+### What would you do differently if you started again? {mid}
+
+:::quick
+**Write a short design note before every major feature, and set up tests and CI from day one.**
+**Why it matters:** shows reflection and maturity.
+:::
+
+:::say
+- I'd write a **short design note** before every major feature, like I did for record storage in Digital Classroom.
+- It **saved rework** and let others **review decisions early**.
+- I'd also set up **automated tests and CI from day one**, instead of adding most tests later.
+:::
+
+### How do you deploy, and how do you handle environment variables? {basic}
+
+:::quick
+**Frontends on Vercel, APIs on Render, databases on Atlas/Neon; auto-deploy from GitHub; secrets only in platform environment variables.**
+**Why it matters:** DevOps is a "good to have" for the Kochi role.
+:::
+
+:::say
+- The **frontends deploy on Vercel** and the **APIs on Render**, both **automatically from GitHub** when I push to main.
+- Databases are **MongoDB Atlas** and **Neon PostgreSQL**, with **separate test and live databases**.
+- **Secrets** live in each platform's **environment variables**, never in the code; I keep a **`.env.example`** with names only.
+- I **check logs** on Render and **test the deployed version** before announcing a release.
+:::
+
+### How do you test and debug production issues? {mid}
+
+:::quick
+**Reproduce → check logs and the failing request → write a failing test → fix → keep the test.**
+**Why it matters:** shows a calm, repeatable process.
+:::
+
+:::say
+- I **reproduce** the issue first, and check the **server logs** and the **exact request** that failed.
+- I **write a test that fails** because of the bug, **fix it**, and **keep the test** so it can't come back.
+- In Digital Classroom, field feedback from installers was usually **fixed the same day**, because each release went through the **tests and a real box** before going live.
+:::

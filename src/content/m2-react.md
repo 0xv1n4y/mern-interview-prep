@@ -1,0 +1,623 @@
+# React
+
+The most-asked React interview questions, explained simply: short answer, everyday example, code and a point-wise interview answer. **25 questions**, of which **16 are ★ must-ask**. Open a question and use the **Practice** tab to answer by typing or speaking and get AI feedback.
+
+## Key terms in plain English
+
+| Term | What it means (simply) |
+|---|---|
+| Component | A reusable piece of the screen, like a button, a card or a whole page. Written as a function. |
+| JSX | HTML-like code written inside JavaScript. React converts it into real JavaScript. |
+| Props | Inputs passed from a parent component to a child, like arguments to a function. Read-only. |
+| State | Data owned by a component that can change. When it changes, the screen updates. |
+| Render | React running your component function to work out what the screen should look like. |
+| Re-render | Running the component again because its state, props or context changed. |
+| Hook | A special function starting with `use` that lets a component use React features (state, effects). |
+| Side effect | Anything outside drawing the screen: API calls, timers, saving to localStorage. |
+| Virtual DOM | A lightweight copy of the page that React keeps in memory to find what changed. |
+| Reconciliation | React comparing the old and new virtual DOM and updating only the differences. |
+| Prop drilling | Passing props through many layers of components that don't need them, just to reach a deep child. |
+| Memoization | Remembering a previous result so you don't calculate it again. |
+| SPA | Single Page Application: one HTML page; React swaps content without full page reloads. |
+
+## React basics
+
+### What is React and why is it used? {basic} {star}
+
+:::quick
+React is a JavaScript **library** (made by Meta) for building user interfaces using **reusable components**. It updates the screen efficiently when data changes.
+:::
+
+:::simple
+Like LEGO blocks: you build small pieces (button, card, navbar) once and combine them to build any page.
+:::
+
+**📘 Explanation**
+
+- **Component-based:** build once, reuse everywhere.
+- **Declarative:** you describe what the UI should look like; React handles the DOM updates.
+- **Virtual DOM:** fast updates; only changed parts are redrawn.
+- **One-way data flow:** data flows parent → child, which makes bugs easier to trace.
+- Huge ecosystem: React Router, Redux, React Query, Next.js.
+
+:::say
+- React is a component-based library for building UIs.
+- I describe the UI for a given state, and React efficiently updates the DOM using the virtual DOM.
+- I used it to build three dashboards (teacher, school, admin) in my VTMS project.
+:::
+
+### What is the Virtual DOM? {basic} {star}
+
+:::quick
+A lightweight copy of the real DOM kept in memory. When state changes, React builds a new virtual DOM, compares it with the old one (**diffing**), and updates **only the parts that changed** in the real DOM (**reconciliation**).
+:::
+
+:::simple
+Before repainting a room, you compare a photo of the old room with the new design and only repaint the walls that changed, instead of repainting the whole house.
+:::
+
+:::say
+- Updating the real DOM is slow, so React compares virtual DOM trees and applies only the minimum changes.
+:::
+
+### What is JSX? {basic} {star}
+
+:::quick
+JSX lets you write HTML-like code inside JavaScript. It is converted into `React.createElement()` calls. Use `{ }` to put JavaScript values inside.
+:::
+
+**📘 Explanation**
+
+- Use `className` instead of `class`, and `htmlFor` instead of `for`.
+- A component must return **one parent element** (or a Fragment `<>...</>`).
+
+```js
+function Welcome() {
+  const name = 'Vinay';
+  const isLoggedIn = true;
+  return (
+    <div className="card">
+      <h1>Hello, {name}</h1>
+      {isLoggedIn ? <p>Welcome back!</p> : <p>Please log in</p>}
+    </div>
+  );
+}
+```
+
+### What is a component? Functional vs class components {basic}
+
+:::quick
+A component is a function that returns JSX. Today we use **functional components with hooks**. Class components are the older style using `this.state` and lifecycle methods.
+:::
+
+```js
+// Functional component (modern)
+function Greeting({ name }) {
+  return <h2>Hi {name}</h2>;
+}
+
+// Class component (older)
+class GreetingOld extends React.Component {
+  render() { return <h2>Hi {this.props.name}</h2>; }
+}
+```
+
+### What is the difference between props and state? {basic} {star}
+
+:::quick
+**Props** are inputs from the parent: read-only. **State** is the component's own data: it can change, and changing it re-renders the component.
+:::
+
+:::simple
+Props are like your **name** given by your parents (you can't change it yourself). State is like your **mood**: it belongs to you and changes during the day.
+:::
+
+```js
+function Counter({ title }) {           // title = prop (from parent)
+  const [count, setCount] = useState(0); // count = state (own data)
+  return (
+    <div>
+      <h3>{title}</h3>
+      <p>{count}</p>
+      <button onClick={() => setCount(count + 1)}>+1</button>
+    </div>
+  );
+}
+// <Counter title="Likes" />
+```
+
+:::say
+- Props flow down from parent to child and are read-only.
+- State is owned by a component; updating it with the setter re-renders the component.
+:::
+
+### Why do we need keys in lists? {basic} {star}
+
+:::quick
+Keys help React identify each list item between renders. Use a **unique, stable id**. Don't use the array index if the list can be reordered, filtered or have items added/removed: React may attach the wrong data to the wrong item.
+:::
+
+:::simple
+Like roll numbers in a class: if students change seats, the teacher still knows who is who by roll number, not by seat position.
+:::
+
+```js
+{users.map(user => (
+  <UserCard key={user.id} user={user} />    // good: stable id
+))}
+
+{users.map((user, index) => (
+  <UserCard key={index} user={user} />      // risky if the list changes
+))}
+```
+
+:::warn
+Using `Math.random()` as a key. It changes every render, so React recreates every item.
+:::
+
+### What is conditional rendering? {basic}
+
+```js
+{isLoading && <Spinner />}
+{error ? <ErrorMessage /> : <Dashboard />}
+{items.length === 0 && <p>No items found</p>}
+```
+
+:::warn
+`{count && <p>...</p>}` prints **0** on screen when count is 0. Use `{count > 0 && ...}`.
+:::
+
+## Hooks
+
+:::note
+Hooks are the most-asked React topic. Know `useState` and `useEffect` very well.
+:::
+
+### What are hooks? What are the rules of hooks? {basic} {star}
+
+:::quick
+Hooks are functions starting with `use` that let functional components use React features like state and side effects. **Rules:** (1) call hooks only at the **top level** (not inside if/loops), (2) call them only inside **React components or custom hooks**.
+:::
+
+:::simple
+Hooks are like plug points in a wall: they give your component access to React's "electricity" (state, effects). But you must install them in the same places every time.
+:::
+
+**📘 Explanation**
+
+- Common hooks: `useState`, `useEffect`, `useContext`, `useRef`, `useMemo`, `useCallback`, `useReducer`.
+- React tracks hooks by their **order**, which is why they can't be inside conditions.
+
+### Explain useState {basic} {star}
+
+:::quick
+`useState` adds state to a component. It returns the current value and a function to update it. Updating state re-renders the component.
+:::
+
+```js
+const [count, setCount] = useState(0);
+
+setCount(count + 1);           // simple update
+setCount(prev => prev + 1);    // safer when the new value depends on the old one
+
+// Objects and arrays: always create a NEW copy
+const [user, setUser] = useState({ name: 'Vinay', city: 'Hyd' });
+setUser(prev => ({ ...prev, city: 'Vizag' }));
+
+const [todos, setTodos] = useState([]);
+setTodos(prev => [...prev, newTodo]);
+```
+
+:::say
+- useState returns a value and a setter; calling the setter re-renders the component.
+- For objects and arrays I always create a new copy, because React compares references.
+- When the new value depends on the old one, I use the functional form `setX(prev => ...)`.
+:::
+
+:::warn
+Changing state directly (`user.city = "Vizag"`). React won't notice and won't re-render.
+:::
+
+### Why does state not update immediately after setState? {mid}
+
+:::quick
+State updates are **scheduled**, not instant. React batches them and re-renders later, so the variable still has the old value in the current function run.
+:::
+
+```js
+const [count, setCount] = useState(0);
+function handleClick() {
+  setCount(count + 1);
+  console.log(count);        // still 0 here
+  setCount(count + 1);       // also sets 1, not 2
+}
+// Fix: setCount(c => c + 1); setCount(c => c + 1);  → 2
+```
+
+### Explain useEffect and its dependency array {basic} {star}
+
+:::quick
+`useEffect` runs **side effects** (API calls, timers, subscriptions) **after** the component renders. The dependency array decides **when** it runs again. The function you return is the **cleanup**.
+:::
+
+:::simple
+useEffect is like a "to-do after reaching home" list. The dependency array says when to repeat it: `[]` = only the first day, `[weather]` = whenever the weather changes, no array = every single time.
+:::
+
+```js
+useEffect(() => {
+  console.log('Runs after EVERY render');
+});
+
+useEffect(() => {
+  console.log('Runs ONCE after the first render (like componentDidMount)');
+}, []);
+
+useEffect(() => {
+  console.log('Runs when userId changes');
+}, [userId]);
+
+useEffect(() => {
+  const timer = setInterval(() => console.log('tick'), 1000);
+  return () => clearInterval(timer);   // cleanup: runs on unmount / before next run
+}, []);
+```
+
+:::say
+- useEffect runs side effects after render.
+- Empty array = run once; with values = run when they change; no array = run every render.
+- The returned cleanup removes timers and listeners to prevent memory leaks.
+:::
+
+:::warn
+Updating state inside useEffect without a dependency array causes an **infinite loop** (render → effect → setState → render…).
+:::
+
+### What is useRef? {basic}
+
+:::quick
+`useRef` stores a value that **survives re-renders but does not cause a re-render** when it changes. Most used to access a DOM element directly (e.g. focus an input).
+:::
+
+:::simple
+useState is a whiteboard everyone looks at (changing it updates the room). useRef is a note in your pocket: it remembers things, but nobody notices when you change it.
+:::
+
+```js
+function SearchBox() {
+  const inputRef = useRef(null);
+  useEffect(() => { inputRef.current.focus(); }, []);   // auto-focus
+  return <input ref={inputRef} placeholder="Search" />;
+}
+```
+
+### useMemo vs useCallback vs React.memo {mid} {star}
+
+:::quick
+`useMemo` remembers a **calculated value**. `useCallback` remembers a **function**. `React.memo` remembers a **component** and skips re-rendering it if its props didn't change.
+:::
+
+:::simple
+useMemo: write the answer of a long maths problem on a sticky note so you don't solve it again. useCallback: keep the same phone number instead of getting a new one every day. React.memo: don't reprint a page if nothing on it changed.
+:::
+
+```js
+// useMemo: expensive calculation
+const total = useMemo(() => cart.reduce((sum, i) => sum + i.price, 0), [cart]);
+
+// useCallback: stable function passed to a child
+const handleDelete = useCallback(id => setItems(items => items.filter(i => i.id !== id)), []);
+
+// React.memo: skip re-render if props are the same
+const ItemRow = React.memo(function ItemRow({ item, onDelete }) {
+  return <li>{item.name} <button onClick={() => onDelete(item.id)}>x</button></li>;
+});
+```
+
+:::say
+- useMemo caches a value, useCallback caches a function, and React.memo caches a component's render.
+- I use them only when there is a real performance problem, measured with the React Profiler.
+:::
+
+### What is a custom hook? {mid} {star}
+
+:::quick
+A custom hook is your own function starting with `use` that reuses **logic** (state + effects) across components. Example: `useFetch`, `useLocalStorage`, `useDebounce`.
+:::
+
+```js
+function useFetch(url) {
+  const [data, setData] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+
+  useEffect(() => {
+    setLoading(true);
+    fetch(url)
+      .then(res => { if (!res.ok) throw new Error('Failed'); return res.json(); })
+      .then(setData)
+      .catch(err => setError(err.message))
+      .finally(() => setLoading(false));
+  }, [url]);
+
+  return { data, loading, error };
+}
+
+// Use it anywhere:
+const { data: users, loading, error } = useFetch('/api/users');
+```
+
+:::say
+- Custom hooks let me reuse stateful logic, like data fetching, without copying code between components.
+:::
+
+## Data flow and state management
+
+### What is lifting state up and prop drilling? {basic} {star}
+
+:::quick
+**Lifting state up:** when two siblings need the same data, move the state to their common parent and pass it down. **Prop drilling:** passing props through many middle components that don't use them. Fix it with **Context** or a state library.
+:::
+
+:::simple
+Prop drilling is like passing a message through 5 people in a line just to reach the last person. Context is like an announcement on a loudspeaker: anyone who needs it can hear it.
+:::
+
+```js
+function Parent() {
+  const [city, setCity] = useState('Hyderabad');   // lifted up
+  return (
+    <>
+      <CityPicker city={city} onChange={setCity} />
+      <Weather city={city} />
+    </>
+  );
+}
+```
+
+### What is the Context API? {basic} {star}
+
+:::quick
+Context shares data (like the logged-in user, theme or language) with **any component in the tree** without passing props through every level.
+:::
+
+```js
+const AuthContext = createContext(null);
+
+function AuthProvider({ children }) {
+  const [user, setUser] = useState(null);
+  return (
+    <AuthContext.Provider value={{ user, login: setUser, logout: () => setUser(null) }}>
+      {children}
+    </AuthContext.Provider>
+  );
+}
+
+function Navbar() {
+  const { user, logout } = useContext(AuthContext);
+  return user ? <button onClick={logout}>Logout {user.name}</button> : <a href="/login">Login</a>;
+}
+```
+
+:::say
+- I use Context for app-wide data like the logged-in user or theme.
+- For data that changes very often, Context can cause many re-renders, so I'd use Redux or Zustand there.
+:::
+
+### What is Redux? When do you need it? {mid} {star}
+
+:::quick
+Redux is a library that keeps app-wide state in **one central store**. Components **dispatch actions**; **reducers** create the new state. Use **Redux Toolkit** today. You need it when many components share and update complex data.
+:::
+
+:::simple
+Redux is like a bank: there is one central place for the money (store). You can't change the balance directly; you submit a slip (action), and the cashier (reducer) updates the balance.
+:::
+
+```js
+// cartSlice.js (Redux Toolkit)
+const cartSlice = createSlice({
+  name: 'cart',
+  initialState: { items: [] },
+  reducers: {
+    addItem: (state, action) => { state.items.push(action.payload); },   // Immer allows this
+    removeItem: (state, action) => { state.items = state.items.filter(i => i.id !== action.payload); },
+  },
+});
+export const { addItem, removeItem } = cartSlice.actions;
+
+// In a component
+const items = useSelector(state => state.cart.items);
+const dispatch = useDispatch();
+dispatch(addItem({ id: 1, name: 'Shoes' }));
+```
+
+:::say
+- Redux gives one predictable store: actions describe what happened, reducers decide the new state.
+- I used Redux Toolkit at Snowa for data shared across 20+ dashboard pages.
+- For small apps, useState and Context are enough.
+:::
+
+### What are controlled and uncontrolled components? {basic} {star}
+
+:::quick
+**Controlled:** React state holds the input value (`value` + `onChange`). **Uncontrolled:** the DOM holds the value and you read it with a `ref` when needed. Controlled is more common because you can validate as the user types.
+:::
+
+```js
+// Controlled
+function LoginForm() {
+  const [email, setEmail] = useState('');
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    if (!email.includes('@')) return alert('Invalid email');
+    console.log('Login with', email);
+  };
+  return (
+    <form onSubmit={handleSubmit}>
+      <input value={email} onChange={e => setEmail(e.target.value)} />
+      <button type="submit">Login</button>
+    </form>
+  );
+}
+
+// Uncontrolled
+function QuickForm() {
+  const nameRef = useRef();
+  return <form onSubmit={e => { e.preventDefault(); console.log(nameRef.current.value); }}>
+    <input ref={nameRef} /></form>;
+}
+```
+
+## API calls, routing and real apps
+
+### How do you call an API in React? {basic} {star}
+
+:::quick
+Call it inside `useEffect` (or an event handler), store the result in state, and always handle **loading**, **error** and **empty** states.
+:::
+
+```js
+function Users() {
+  const [users, setUsers] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    async function load() {
+      try {
+        const res = await fetch('/api/users');
+        if (!res.ok) throw new Error('Could not load users');
+        setUsers(await res.json());
+      } catch (err) {
+        setError(err.message);
+      } finally {
+        setLoading(false);
+      }
+    }
+    load();
+  }, []);
+
+  if (loading) return <p>Loading...</p>;
+  if (error) return <p>Error: {error}</p>;
+  if (users.length === 0) return <p>No users yet</p>;
+  return <ul>{users.map(u => <li key={u.id}>{u.name}</li>)}</ul>;
+}
+```
+
+:::say
+- I fetch in useEffect, keep loading and error state, and show a proper empty state.
+- In bigger apps I use React Query or a custom hook, which also gives caching and retries.
+:::
+
+:::hint2
+Mention **React Query (TanStack Query)**: it handles caching, loading and refetching automatically.
+:::
+
+### How does routing work in React (React Router)? {basic}
+
+:::quick
+React Router shows different components for different URLs **without reloading the page**. Use `Routes`/`Route` to define pages, `Link` to navigate, `useParams` to read URL values, `useNavigate` to move in code.
+:::
+
+```js
+<BrowserRouter>
+  <nav><Link to="/">Home</Link> <Link to="/users">Users</Link></nav>
+  <Routes>
+    <Route path="/" element={<Home />} />
+    <Route path="/users" element={<Users />} />
+    <Route path="/users/:id" element={<UserDetail />} />
+    <Route path="*" element={<NotFound />} />
+  </Routes>
+</BrowserRouter>
+
+function UserDetail() {
+  const { id } = useParams();       // reads :id from the URL
+  const navigate = useNavigate();
+  return <button onClick={() => navigate('/users')}>Back</button>;
+}
+```
+
+### How do you create a protected (private) route? {mid}
+
+:::quick
+Wrap the page in a component that checks if the user is logged in; if not, redirect to login.
+:::
+
+```js
+function PrivateRoute({ children }) {
+  const { user } = useContext(AuthContext);
+  return user ? children : <Navigate to="/login" replace />;
+}
+
+<Route path="/dashboard" element={<PrivateRoute><Dashboard /></PrivateRoute>} />
+```
+
+:::hint2
+Always say: **the server must also check permissions.** Frontend checks are only for user experience, not security.
+:::
+
+### What is an Error Boundary? {mid}
+
+:::quick
+A component that catches JavaScript errors in its children and shows a fallback UI instead of a blank white screen. (It must be a class component, or use the `react-error-boundary` library.)
+:::
+
+## Performance
+
+### When does a component re-render? {mid}
+
+:::quick
+When (1) its **state** changes, (2) its **parent re-renders**, or (3) a **context** it uses changes.
+:::
+
+### How do you improve React app performance? {mid} {star}
+
+:::quick
+Avoid unnecessary re-renders, load code only when needed, and don't render huge lists at once.
+:::
+
+**📘 Explanation**
+
+- **React.memo, useMemo, useCallback** to skip repeat work.
+- **Lazy loading** pages with `React.lazy` + `Suspense` (code splitting).
+- **Pagination or virtualisation** for long lists (react-window).
+- **Debounce** search inputs.
+- Keep state **close to where it's used**, so fewer components re-render.
+- Use proper **keys** in lists.
+- Measure with the **React DevTools Profiler** before optimising.
+
+```js
+const Reports = React.lazy(() => import('./Reports'));
+
+<Suspense fallback={<p>Loading...</p>}>
+  <Reports />
+</Suspense>
+```
+
+:::say
+- I measure first with the React Profiler, then fix the real cause.
+- Common fixes: memoisation, lazy loading routes, paginating long lists and debouncing inputs.
+:::
+
+### What is the difference between React and Next.js? {basic}
+
+:::quick
+React is a UI library (runs in the browser). **Next.js** is a framework built on React that adds **server-side rendering**, file-based routing and API routes. This gives better SEO and a faster first load.
+:::
+
+## Quick revision sheet
+
+| Topic | Remember this |
+|---|---|
+| React | Component-based UI library; virtual DOM for efficient updates. |
+| Props vs state | Props = read-only input from parent; state = own data that changes. |
+| useState | Value + setter; new copy for objects/arrays; prev => for dependent updates. |
+| useEffect | [] once · [x] when x changes · none every render · return cleanup. |
+| Keys | Unique stable id; avoid index for changing lists. |
+| useRef | Remembers without re-render; DOM access. |
+| Memo hooks | useMemo = value, useCallback = function, React.memo = component. |
+| Context | Share global data without prop drilling. |
+| Redux | Central store; dispatch actions; reducers make new state. |
+| Controlled input | value + onChange from state. |
+| Performance | Profile → memo → lazy load → paginate/virtualise → debounce. |

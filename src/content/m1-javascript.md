@@ -1,0 +1,883 @@
+# JavaScript
+
+The most-asked JavaScript interview questions, explained simply: short answer, everyday example, code and a point-wise interview answer. **41 questions**, of which **18 are ★ must-ask**. Open a question and use the **Practice** tab to answer by typing or speaking and get AI feedback.
+
+## Key terms in plain English
+
+| Term | What it means (simply) |
+|---|---|
+| Variable | A named box that stores a value, like `let age = 25`. |
+| Scope | Where in the code a variable can be seen and used. |
+| Hoisting | JavaScript notes down all declarations before running the code, so some can be used "before" the line where they are written. |
+| Closure | A function that remembers the variables around it, even after the outer function has finished. |
+| Callback | A function you give to another function, to be called later. |
+| Promise | An object that says "I will give you a result later": either success (resolved) or failure (rejected). |
+| async / await | A cleaner way to write promise code so it reads top to bottom like normal code. |
+| Event loop | The manager that decides which waiting task JavaScript runs next. |
+| Call stack | The list of functions currently running; the last one added finishes first. |
+| Synchronous | One line runs after another; each waits for the previous to finish. |
+| Asynchronous | Slow work (network, timers) happens in the background while other code keeps running. |
+| Prototype | A "parent object" that other objects can borrow methods from. |
+| `this` | A keyword that points to the object that is calling the function. |
+| DOM | The browser's live tree of the web page, which JavaScript can read and change. |
+| Immutable | Cannot be changed after it is created; you make a new copy instead. |
+| Pure function | Same input always gives the same output, and it changes nothing outside itself. |
+
+## JavaScript basics
+
+:::note
+These are asked in almost every interview. Answer them confidently and briefly.
+:::
+
+### What is JavaScript? {basic}
+
+:::quick
+JavaScript is a programming language that makes web pages interactive. It runs in every browser, and with Node.js it also runs on servers.
+:::
+
+:::simple
+If a web page is a house, **HTML** is the walls, **CSS** is the paint, and **JavaScript** is the electricity: it makes the lights, fans and doorbell actually work.
+:::
+
+**📘 Explanation**
+
+- Single-threaded: it does one thing at a time, but handles slow work in the background (async).
+- Dynamically typed: you don't declare types; a variable can hold any value.
+- Used for frontend (React), backend (Node.js), mobile apps and more.
+
+:::say
+- JavaScript is a single-threaded, dynamically typed language used to build interactive web apps.
+- It runs in the browser and, with Node.js, on the server, so I use one language across the whole MERN stack.
+:::
+
+### What are the data types in JavaScript? {basic} {star}
+
+:::quick
+7 **primitive** types: `string`, `number`, `boolean`, `undefined`, `null`, `bigint`, `symbol`. Everything else is an **object** (including arrays and functions).
+:::
+
+:::simple
+Primitives are like single items (a number, a word). Objects are like a bag that can hold many items together.
+:::
+
+```js
+let name = 'Vinay';          // string
+let age = 25;                // number
+let isActive = true;         // boolean
+let x;                       // undefined (declared, no value yet)
+let y = null;                // null (empty on purpose)
+let big = 123n;              // bigint
+let id = Symbol('id');       // symbol (unique value)
+let user = { name: 'Vinay' };// object
+let skills = ['JS', 'React'];// array (also an object)
+
+typeof skills;  // 'object'
+typeof null;    // 'object'  (an old bug in JavaScript)
+```
+
+:::say
+- There are 7 primitive types and objects.
+- Primitives are copied by value; objects are copied by reference.
+:::
+
+### What is the difference between var, let and const? {basic} {star}
+
+:::quick
+`var` is function-scoped and can be re-declared. `let` and `const` are block-scoped (inside `{ }`). `const` cannot be reassigned. Use `const` by default, `let` when the value must change, and avoid `var`.
+:::
+
+:::simple
+`var` is like writing on a public notice board in the whole building. `let` and `const` are like writing on a whiteboard inside one room only. `const` is written in permanent marker.
+:::
+
+```js
+if (true) {
+  var a = 1;
+  let b = 2;
+  const c = 3;
+}
+console.log(a); // 1         (var leaks out of the block)
+console.log(b); // ReferenceError: b is not defined
+
+const user = { name: 'Vinay' };
+user.name = 'Ravi';  // allowed: we change the object inside
+// user = {};        // error: cannot point const to a new value
+```
+
+:::say
+- `var` is function-scoped; `let` and `const` are block-scoped.
+- `const` stops reassignment, but the object it points to can still change.
+- I use `const` by default and `let` only when I need to reassign.
+:::
+
+:::warn
+Saying "const values can never change". The **variable** can't be reassigned, but an object or array inside it can be modified.
+:::
+
+### What is hoisting? {basic} {star}
+
+:::quick
+Before running code, JavaScript moves declarations to the top of their scope. `var` is hoisted with the value `undefined`; function declarations are hoisted completely; `let` and `const` are hoisted but cannot be used before their line (this gap is called the **Temporal Dead Zone**).
+:::
+
+:::simple
+Like a teacher taking attendance before class starts: all names are known, but not everyone has "arrived" with their value yet.
+:::
+
+```js
+console.log(a);   // undefined
+var a = 10;
+
+sayHi();          // works: 'Hi'
+function sayHi() { console.log('Hi'); }
+
+console.log(b);   // ReferenceError (Temporal Dead Zone)
+let b = 20;
+```
+
+:::say
+- Hoisting means declarations are processed before the code runs.
+- Function declarations can be called before they are written; `let` and `const` cannot be used before their line.
+:::
+
+### What is the difference between == and ===? {basic} {star}
+
+:::quick
+`==` compares values **after converting types**. `===` compares **value and type** with no conversion. Always use `===`.
+:::
+
+:::simple
+`==` says "5 rupees and a 5-rupee coin are the same". `===` says "only if both are coins and both are 5".
+:::
+
+```js
+5 == '5'          // true  (string converted to number)
+5 === '5'         // false (different types)
+null == undefined // true
+null === undefined// false
+0 == false        // true
+0 === false       // false
+```
+
+:::say
+- `===` checks value and type, so there are no surprises from type conversion.
+- I always use strict equality.
+:::
+
+### What is the difference between null and undefined? {basic}
+
+:::quick
+`undefined` means a variable exists but has **no value yet** (JavaScript sets it). `null` means **"empty on purpose"** (you set it).
+:::
+
+:::simple
+`undefined` is an empty glass nobody filled yet. `null` is a glass you deliberately emptied.
+:::
+
+```js
+let a;          // undefined
+let b = null;   // null
+typeof a;       // 'undefined'
+typeof b;       // 'object'
+```
+
+### What are truthy and falsy values? {basic}
+
+:::quick
+In an `if`, every value becomes true or false. **Falsy** values: `false`, `0`, `""` (empty string), `null`, `undefined`, `NaN`. Everything else is **truthy**, even `[]`, `{}` and `"0"`.
+:::
+
+```js
+if ([])  console.log('empty array is truthy');   // prints
+if ('0') console.log('"0" is truthy');           // prints
+if (0)   console.log('never');                   // doesn't print
+
+const count = 0;
+console.log(count || 10);  // 10  (|| treats 0 as missing)
+console.log(count ?? 10);  // 0   (?? only replaces null/undefined)
+```
+
+:::hint2
+Mention `??` (nullish coalescing). It shows you know modern JavaScript.
+:::
+
+### What is the difference between primitive and reference types? {mid} {star}
+
+:::quick
+Primitives are **copied by value** (you get a separate copy). Objects and arrays are **copied by reference** (both variables point to the same object).
+:::
+
+:::simple
+Copying a primitive is like photocopying a page: two separate pages. Copying an object is like sharing a Google Doc link: both people edit the same document.
+:::
+
+```js
+let a = 10;
+let b = a;
+b = 20;
+console.log(a); // 10 (separate copy)
+
+const p1 = { name: 'Vinay' };
+const p2 = p1;
+p2.name = 'Ravi';
+console.log(p1.name); // 'Ravi' (same object)
+```
+
+:::say
+- Primitives are copied by value, objects by reference.
+- That's why in React I create a new object instead of changing the old one.
+:::
+
+## Functions, scope and closures
+
+:::note
+Closures and scope are the most-asked "concept" questions. Use the simple examples here.
+:::
+
+### What is scope? {basic}
+
+:::quick
+Scope decides **where a variable can be used**. Global scope: everywhere. Function scope: inside that function. Block scope: inside `{ }` (for `let`/`const`). Inner code can see outer variables, not the other way round.
+:::
+
+:::simple
+Like rooms in a house: from your bedroom you can see things in the hall, but people in the hall can't see inside your locked cupboard.
+:::
+
+```js
+const company = 'ABC';          // global
+function team() {
+  const lead = 'Ravi';          // function scope
+  if (true) {
+    const member = 'Vinay';     // block scope
+    console.log(company, lead, member); // all visible here
+  }
+  // console.log(member);       // error: not visible outside the block
+}
+```
+
+### What is a closure? {mid} {star}
+
+:::quick
+A closure is a function that **remembers the variables from where it was created**, even after the outer function has finished running.
+:::
+
+:::simple
+Like a student who leaves school but still remembers what the teacher taught. The "classroom" is gone, but the memory stays.
+:::
+
+**📘 Explanation**
+
+- Every function in JavaScript creates a closure automatically.
+- Used for: private variables, counters, debounce, event handlers, React hooks.
+
+```js
+function createCounter() {
+  let count = 0;               // private: no one outside can touch it
+  return function () {
+    count++;
+    return count;
+  };
+}
+
+const counter = createCounter();
+console.log(counter()); // 1
+console.log(counter()); // 2
+console.log(counter()); // 3  (count is remembered)
+```
+
+:::say
+- A closure is a function bundled with the variables of the scope where it was created.
+- It lets me keep private state, like a counter, without global variables.
+- Real uses: debounce timers, event handlers and React hooks.
+:::
+
+### Function declaration vs function expression vs arrow function {basic}
+
+:::quick
+A **declaration** (`function add() {}`) is fully hoisted. An **expression** (`const add = function () {}`) is not. An **arrow function** (`const add = () => {}`) is shorter and does **not have its own `this`**.
+:::
+
+```js
+function add(a, b) { return a + b; }          // declaration
+const sub = function (a, b) { return a - b; }; // expression
+const mul = (a, b) => a * b;                   // arrow (implicit return)
+```
+
+:::say
+- Arrow functions are short and take `this` from the surrounding code, so I use them for callbacks.
+:::
+
+### What is `this` in JavaScript? {mid} {star}
+
+:::quick
+`this` points to **the object that is calling the function**. In a method it's that object; in a normal function call it's `undefined` (strict mode); in an arrow function it's taken from the surrounding code.
+:::
+
+:::simple
+When someone says "my phone", "my" means whoever is speaking. `this` means whoever is calling the function.
+:::
+
+```js
+const user = {
+  name: 'Vinay',
+  greet() { return 'Hi ' + this.name; },
+  greetArrow: () => 'Hi ' + this?.name,
+};
+user.greet();       // 'Hi Vinay'
+user.greetArrow();  // 'Hi undefined' (arrow has no own this)
+
+const fn = user.greet;
+fn();               // this is lost → 'Hi undefined'
+```
+
+:::say
+- `this` is decided by how the function is called, not where it is written.
+- Arrow functions are the exception: they use `this` from the outer scope.
+:::
+
+### What are call, apply and bind? {mid} {star}
+
+:::quick
+All three let you choose what `this` should be. `call` runs the function now with arguments one by one; `apply` runs it now with arguments as an array; `bind` returns a **new function** to run later.
+:::
+
+```js
+function intro(city, role) { return this.name + ' from ' + city + ', ' + role; }
+const me = { name: 'Vinay' };
+
+intro.call(me, 'Hyderabad', 'Developer');
+intro.apply(me, ['Hyderabad', 'Developer']);
+const later = intro.bind(me, 'Hyderabad');
+later('Developer');
+```
+
+:::hint2
+Memory trick: **C**all = **C**ommas, **A**pply = **A**rray, **B**ind = **B**ack later.
+:::
+
+## Asynchronous JavaScript
+
+:::note
+Async code is asked in every MERN interview: callbacks, promises, async/await and the event loop.
+:::
+
+### What is the difference between synchronous and asynchronous code? {basic}
+
+:::quick
+**Synchronous:** each line waits for the previous one. **Asynchronous:** slow tasks (API calls, timers, file reads) run in the background, and the rest of the code continues.
+:::
+
+:::simple
+Synchronous is like waiting at a counter until your food is ready. Asynchronous is like ordering, getting a token, and sitting down. They call you when it's ready.
+:::
+
+```js
+console.log('1. Order food');
+setTimeout(() => console.log('3. Food ready'), 2000);
+console.log('2. Sit and chat');
+// Output: 1, 2, then 3 after 2 seconds
+```
+
+### Explain the event loop {mid} {star}
+
+:::quick
+JavaScript runs one thing at a time on the **call stack**. Slow tasks are handed to the browser/Node. When they finish, their callbacks wait in a queue. The **event loop** moves them to the stack **only when the stack is empty**. **Promise callbacks (microtasks) always run before timers (macrotasks).**
+:::
+
+:::simple
+A restaurant with one chef (call stack). Waiters (browser/Node) handle slow jobs like waiting for an oven. When a dish is ready, it goes into a queue. The manager (event loop) gives the chef the next job only when the chef is free. VIP orders (promises) are always served before normal orders (timers).
+:::
+
+**📘 Explanation**
+
+- **Call stack:** where code runs, one function at a time.
+- **Web APIs / Node APIs:** handle timers, network and files in the background.
+- **Microtask queue:** promise `.then` callbacks and code after `await`. Runs first.
+- **Macrotask queue:** `setTimeout`, `setInterval`, I/O. Runs after microtasks.
+
+```js
+console.log('A');
+setTimeout(() => console.log('B'), 0);
+Promise.resolve().then(() => console.log('C'));
+console.log('D');
+// Output: A D C B
+```
+
+:::output
+- A and D are synchronous, so they print first.
+- C is a promise callback (microtask), so it runs next.
+- B is a timer (macrotask), so it runs last, even with 0 ms.
+:::
+
+:::say
+- JavaScript is single-threaded; the event loop lets it handle async work without blocking.
+- Order: synchronous code → all microtasks (promises) → one macrotask (timer) → repeat.
+- That's why heavy loops freeze the page: they block the only thread.
+:::
+
+### What is callback hell? {basic}
+
+:::quick
+Many callbacks nested inside each other, forming a "pyramid" that is hard to read and handle errors in. Fix it with **promises** or **async/await**.
+:::
+
+```js
+// Callback hell
+getUser(1, user => {
+  getOrders(user, orders => {
+    getDetails(orders[0], details => {
+      console.log(details);
+    });
+  });
+});
+
+// Same with async/await
+const user = await getUser(1);
+const orders = await getOrders(user);
+const details = await getDetails(orders[0]);
+```
+
+### What is a Promise? {basic} {star}
+
+:::quick
+A Promise is an object for a value that will arrive **later**. It has 3 states: **pending** (waiting), **fulfilled** (success) and **rejected** (failed). Use `.then()` for success, `.catch()` for errors, `.finally()` for both.
+:::
+
+:::simple
+Ordering a parcel online: you get a tracking number (promise). Later it is either delivered (fulfilled) or lost (rejected).
+:::
+
+```js
+const orderFood = new Promise((resolve, reject) => {
+  const ready = true;
+  setTimeout(() => ready ? resolve('Pizza delivered') : reject('Order failed'), 1000);
+});
+
+orderFood
+  .then(msg => console.log(msg))
+  .catch(err => console.error(err))
+  .finally(() => console.log('Order closed'));
+```
+
+:::say
+- A promise represents a future result with three states: pending, fulfilled and rejected.
+- It avoids callback hell and gives one place to handle errors with `.catch`.
+:::
+
+### What is async/await? How do you handle errors? {basic} {star}
+
+:::quick
+`async/await` is a cleaner way to write promises. `await` pauses inside an `async` function until the promise finishes. Handle errors with `try/catch`.
+:::
+
+```js
+async function getUser(id) {
+  try {
+    const res = await fetch('/api/users/' + id);
+    if (!res.ok) throw new Error('Request failed: ' + res.status);
+    const user = await res.json();
+    return user;
+  } catch (err) {
+    console.error(err.message);
+    return null;
+  }
+}
+```
+
+:::say
+- async/await is syntax on top of promises that makes async code read like normal code.
+- I wrap awaits in try/catch and check `res.ok`, because fetch only fails on network errors.
+:::
+
+:::warn
+`fetch` does **not** throw an error for 404 or 500. Always check `res.ok`.
+:::
+
+### Promise.all, allSettled, race and any {mid}
+
+:::quick
+`Promise.all`: wait for all; fails if **any** fails. `allSettled`: wait for all; never fails, gives each result. `race`: first one to finish (pass or fail). `any`: first one to **succeed**.
+:::
+
+```js
+// Run two API calls at the same time
+const [user, posts] = await Promise.all([getUser(1), getPosts(1)]);
+
+// Show whatever loaded, even if some failed
+const results = await Promise.allSettled([getStats(), getChart()]);
+results.forEach(r => console.log(r.status)); // 'fulfilled' or 'rejected'
+```
+
+:::say
+- For independent API calls I use Promise.all so they run in parallel instead of one after another.
+:::
+
+### What are debounce and throttle? {mid} {star}
+
+:::quick
+**Debounce:** run the function only after the user **stops** for a set time (search box). **Throttle:** run it **at most once** every set time (scroll, resize).
+:::
+
+:::simple
+Debounce: a lift waits until people stop entering, then closes the door. Throttle: a train leaves every 10 minutes no matter how many people come.
+:::
+
+```js
+function debounce(fn, delay) {
+  let timer;
+  return function (...args) {
+    clearTimeout(timer);                       // cancel the previous call
+    timer = setTimeout(() => fn(...args), delay);
+  };
+}
+
+const search = debounce(text => console.log('Searching', text), 500);
+search('r'); search('re'); search('rea'); search('react');
+// Only 'Searching react' runs, 500 ms after the last call
+```
+
+:::say
+- Debounce reduces API calls in a search box; it uses a closure to remember the timer.
+:::
+
+## Objects, arrays and modern JavaScript (ES6+)
+
+### What are map, filter and reduce? {basic} {star}
+
+:::quick
+`map` changes every item and returns a new array of the same length. `filter` keeps only the items that pass a test. `reduce` combines all items into one value. None of them change the original array.
+:::
+
+:::simple
+`map` = put every apple through a juicer. `filter` = pick only the red apples. `reduce` = put all apples on a scale and get one total weight.
+:::
+
+```js
+const prices = [100, 250, 400];
+
+prices.map(p => p * 2);              // [200, 500, 800]
+prices.filter(p => p > 150);         // [250, 400]
+prices.reduce((sum, p) => sum + p, 0); // 750
+```
+
+### forEach vs map {basic}
+
+:::quick
+`map` returns a **new array**. `forEach` returns **nothing**; it just runs code for each item. Use `map` to transform data, `forEach` for side effects like logging.
+:::
+
+### What are spread and rest operators? {basic} {star}
+
+:::quick
+Both use `...`. **Spread** opens up an array/object into separate items. **Rest** collects many items into one array.
+:::
+
+:::simple
+Spread is opening a box and laying the items on a table. Rest is sweeping the leftover items back into one box.
+:::
+
+```js
+// Spread: open up
+const a = [1, 2];
+const b = [...a, 3, 4];               // [1, 2, 3, 4]
+const user = { name: 'Vinay' };
+const updated = { ...user, city: 'Hyd' };
+
+// Rest: collect
+function sum(...numbers) { return numbers.reduce((t, n) => t + n, 0); }
+sum(1, 2, 3); // 6
+```
+
+### What is destructuring? {basic}
+
+:::quick
+A short way to take values out of arrays or objects into variables.
+:::
+
+```js
+const user = { name: 'Vinay', city: 'Hyderabad', age: 25 };
+const { name, city: location, country = 'India' } = user; // rename + default
+
+const [first, second] = ['React', 'Node'];
+
+function show({ name, age }) { return name + ' is ' + age; } // in parameters
+```
+
+### What is a prototype? How does inheritance work? {mid}
+
+:::quick
+Every object has a hidden link to a **prototype** object. If a property isn't found on the object, JavaScript looks in its prototype, then that prototype's prototype: the **prototype chain**. `class` is just a nicer way to write this.
+:::
+
+:::simple
+If you don't have a tool at home, you borrow it from your parents. If they don't have it, they borrow from grandparents.
+:::
+
+```js
+class Animal {
+  constructor(name) { this.name = name; }
+  speak() { return this.name + ' makes a sound'; }
+}
+class Dog extends Animal {
+  speak() { return this.name + ' barks'; }
+}
+const d = new Dog('Tommy');
+d.speak(); // 'Tommy barks'
+```
+
+## Browser and DOM
+
+### What is the DOM? {basic}
+
+:::quick
+The **Document Object Model** is the browser's tree version of the HTML page. JavaScript can read and change it to update what the user sees.
+:::
+
+:::simple
+The HTML file is the blueprint; the DOM is the actual building you can walk into and rearrange.
+:::
+
+```js
+const title = document.querySelector('h1');
+title.textContent = 'Welcome!';
+document.querySelector('#btn').addEventListener('click', () => alert('Clicked'));
+```
+
+### What is event bubbling and event delegation? {mid} {star}
+
+:::quick
+**Bubbling:** an event on a child also travels up to its parents. **Delegation:** put one listener on the parent and check which child was clicked, instead of adding a listener to every child.
+:::
+
+:::simple
+Instead of giving every student a separate phone, the class teacher has one phone and asks "who is calling?"
+:::
+
+```js
+document.querySelector('#list').addEventListener('click', (e) => {
+  if (e.target.tagName === 'LI') console.log('Clicked', e.target.textContent);
+});
+// Works for items added later too, with only ONE listener
+```
+
+### localStorage vs sessionStorage vs cookies {basic}
+
+:::quick
+**localStorage:** stays until deleted (about 5 MB). **sessionStorage:** cleared when the tab closes. **Cookies:** small (4 KB), sent to the server with every request, can be made `HttpOnly` so JavaScript can't read them (safer for login tokens).
+:::
+
+```js
+localStorage.setItem('theme', 'dark');
+localStorage.getItem('theme');      // 'dark'
+sessionStorage.setItem('step', '2');
+```
+
+:::say
+- For login tokens I prefer HttpOnly cookies, because JavaScript (and so an attacker's script) can't read them.
+:::
+
+## Output-based questions (most asked)
+
+:::note
+For each one, **say your reasoning out loud**. The interviewer is checking how you think, not just the final answer.
+:::
+
+### Output: var in a loop with setTimeout {mid} {star}
+
+```js
+for (var i = 0; i < 3; i++) {
+  setTimeout(() => console.log(i), 100);
+}
+```
+
+:::output
+- Prints **3 3 3**.
+- `var` creates only ONE `i` for the whole loop. By the time the timers run, the loop has finished and `i` is 3.
+- Fix: use `let`, which creates a new `i` for each loop round → prints **0 1 2**.
+:::
+
+### Output: hoisting {basic}
+
+```js
+console.log(x);
+var x = 5;
+console.log(y);
+let y = 10;
+```
+
+:::output
+- First line prints **undefined** (var is hoisted with value undefined).
+- Third line throws **ReferenceError** (let is in the Temporal Dead Zone).
+:::
+
+### Output: event loop order {mid} {star}
+
+```js
+console.log('1');
+setTimeout(() => console.log('2'), 0);
+Promise.resolve().then(() => console.log('3'));
+console.log('4');
+```
+
+:::output
+- Prints **1 4 3 2**.
+- Synchronous first (1, 4), then promise microtask (3), then timer macrotask (2).
+:::
+
+### Output: async/await order {adv}
+
+```js
+async function test() {
+  console.log('A');
+  await null;
+  console.log('B');
+}
+test();
+console.log('C');
+```
+
+:::output
+- Prints **A C B**.
+- A runs immediately. `await` pauses the function and puts the rest (B) in the microtask queue. C runs (synchronous), then B.
+:::
+
+### Output: type conversion {basic}
+
+```js
+console.log(1 + '2');
+console.log('5' - 2);
+console.log(true + 1);
+console.log([] + []);
+console.log(typeof NaN);
+```
+
+:::output
+- `1 + '2'` → **"12"** (+ with a string joins strings).
+- `'5' - 2` → **3** (- converts to numbers).
+- `true + 1` → **2** (true becomes 1).
+- `[] + []` → **""** (empty arrays become empty strings).
+- `typeof NaN` → **"number"**.
+:::
+
+### Output: object reference {basic}
+
+```js
+const a = { count: 1 };
+const b = a;
+b.count = 5;
+console.log(a.count);
+console.log({} === {});
+```
+
+:::output
+- **5**: `b` points to the same object as `a`.
+- **false**: two separate objects are never equal, even if they look the same.
+:::
+
+### Output: this inside an arrow function {mid}
+
+```js
+const obj = {
+  name: 'Vinay',
+  regular() { console.log(this.name); },
+  arrow: () => console.log(this.name),
+};
+obj.regular();
+obj.arrow();
+```
+
+:::output
+- `regular()` prints **Vinay** (called on obj).
+- `arrow()` prints **undefined**: arrow functions don't have their own `this`; they use the outer one (not obj).
+:::
+
+### Output: array methods {basic}
+
+```js
+const arr = [1, 2, 3];
+const res = arr.map(x => { if (x > 1) return x * 2; });
+console.log(res);
+console.log([10, 1, 3].sort());
+```
+
+:::output
+- `[undefined, 4, 6]`: when x is 1 nothing is returned, so map puts undefined.
+- `[1, 10, 3]`: `sort()` compares as **strings** by default. Fix: `sort((a, b) => a - b)`.
+:::
+
+## Coding questions (write these yourself)
+
+:::note
+Explain your idea first, then code, then test with an example.
+:::
+
+### Reverse a string {basic}
+
+```js
+const reverse = s => s.split('').reverse().join('');
+reverse('hello'); // 'olleh'
+```
+
+### Check if a string is a palindrome {basic}
+
+```js
+function isPalindrome(s) {
+  const clean = s.toLowerCase().replace(/[^a-z0-9]/g, '');
+  return clean === clean.split('').reverse().join('');
+}
+isPalindrome('Madam'); // true
+```
+
+### Remove duplicates from an array {basic} {star}
+
+```js
+const unique = arr => [...new Set(arr)];
+unique([1, 2, 2, 3]); // [1, 2, 3]
+```
+
+### Flatten a nested array {mid}
+
+```js
+function flatten(arr) {
+  return arr.reduce((acc, item) =>
+    Array.isArray(item) ? acc.concat(flatten(item)) : acc.concat(item), []);
+}
+flatten([1, [2, [3, 4]], 5]); // [1, 2, 3, 4, 5]
+// Built-in: [1, [2, [3]]].flat(Infinity)
+```
+
+### Two Sum: find two numbers that add up to a target {mid}
+
+:::quick
+Use an object/Map to remember numbers already seen. One loop = fast (O(n)).
+:::
+
+```js
+function twoSum(nums, target) {
+  const seen = {};
+  for (let i = 0; i < nums.length; i++) {
+    const need = target - nums[i];
+    if (need in seen) return [seen[need], i];
+    seen[nums[i]] = i;
+  }
+}
+twoSum([2, 7, 11, 15], 9); // [0, 1]
+```
+
+## Quick revision sheet
+
+| Topic | Remember this |
+|---|---|
+| var / let / const | var = function scope; let/const = block scope; const = no reassign. |
+| Hoisting | var → undefined; function → fully; let/const → TDZ error. |
+| == vs === | Always ===: compares value AND type. |
+| Closure | Function + the variables it remembers from where it was created. |
+| this | Who called the function; arrow functions borrow it from outside. |
+| Event loop | Sync code → promises (microtasks) → timers (macrotasks). |
+| Promise | pending → fulfilled / rejected; .then .catch .finally. |
+| async/await | Cleaner promises; use try/catch; check res.ok with fetch. |
+| map / filter / reduce | Transform / keep some / combine into one. |
+| Spread vs rest | Spread opens up; rest collects. |
+| Copy | Spread = shallow; structuredClone = deep. |
+| Debounce | Wait until the user stops; used in search boxes. |
