@@ -3,34 +3,34 @@ export type PageInfo = { slug: string; title: string; icon: string; badge?: stri
 export type Group = { name: string; pages: PageInfo[] }
 
 export const GROUPS: Group[] = [
-  { name: 'Start here', pages: [{ slug: 'index', title: 'Your interview plan', icon: '🎯' }] },
+  { name: 'Start here', pages: [{ slug: 'index', title: 'Your interview plan', icon: 'plan' }] },
   {
     name: 'Most-asked (simple)',
     pages: [
-      { slug: 'm1-javascript', title: 'JavaScript', icon: '🟨' },
-      { slug: 'm2-react', title: 'React', icon: '⚛️' },
-      { slug: 'm3-node-express', title: 'Node & Express', icon: '🟩' },
-      { slug: 'm4-mongodb', title: 'MongoDB', icon: '🍃' },
-      { slug: 'm5-sql-postgresql', title: 'SQL & PostgreSQL', icon: '🐘' },
-      { slug: 'm6-git-docker-gcp', title: 'Git, Docker & GCP', icon: '🐳' },
+      { slug: 'm1-javascript', title: 'JavaScript', icon: 'js' },
+      { slug: 'm2-react', title: 'React', icon: 'react' },
+      { slug: 'm3-node-express', title: 'Node & Express', icon: 'node' },
+      { slug: 'm4-mongodb', title: 'MongoDB', icon: 'mongo' },
+      { slug: 'm5-sql-postgresql', title: 'SQL & PostgreSQL', icon: 'sql' },
+      { slug: 'm6-git-docker-gcp', title: 'Git, Docker & GCP', icon: 'devops' },
     ],
   },
   {
     name: 'Deep dive',
     pages: [
-      { slug: '01-javascript', title: 'JavaScript', icon: '🟨' },
-      { slug: '01b-typescript', title: 'TypeScript', icon: '🔷' },
-      { slug: '02-react', title: 'React', icon: '⚛️' },
-      { slug: '03-node-express', title: 'Node & Express', icon: '🟩' },
-      { slug: '04-mongodb', title: 'MongoDB', icon: '🍃' },
-      { slug: '05-postgresql', title: 'PostgreSQL', icon: '🐘' },
+      { slug: '01-javascript', title: 'JavaScript', icon: 'js' },
+      { slug: '01b-typescript', title: 'TypeScript', icon: 'ts' },
+      { slug: '02-react', title: 'React', icon: 'react' },
+      { slug: '03-node-express', title: 'Node & Express', icon: 'node' },
+      { slug: '04-mongodb', title: 'MongoDB', icon: 'mongo' },
+      { slug: '05-postgresql', title: 'PostgreSQL', icon: 'sql' },
     ],
   },
   {
     name: 'Your story',
     pages: [
-      { slug: '09-my-projects', title: 'My projects', icon: '📁' },
-      { slug: '10-hr', title: 'HR & behavioural', icon: '🤝' },
+      { slug: '09-my-projects', title: 'My projects', icon: 'projects' },
+      { slug: '10-hr', title: 'HR & behavioural', icon: 'hr' },
     ],
   },
 ]

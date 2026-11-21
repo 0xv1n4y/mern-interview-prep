@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { PanelLeftClose, PanelLeftOpen, Menu, Moon, Search, Sun, Bot } from 'lucide-react'
+import { PanelLeftClose, PanelLeftOpen, Menu, Moon, Search, Sun, Bot, GraduationCap } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Sheet, SheetContent, SheetTitle } from '@/components/ui/sheet'
 import { Kbd } from '@/components/ui/kbd'
@@ -60,7 +60,7 @@ export default function App() {
               <TooltipContent>{sidebar ? 'Hide menu' : 'Show menu'}</TooltipContent>
             </Tooltip>
             <a href={href('index')} className="mr-2 flex items-center gap-2 font-semibold tracking-tight">
-              <span className="flex size-7 items-center justify-center rounded-md bg-primary text-sm text-primary-foreground">IP</span>
+              <span className="flex size-7 items-center justify-center rounded-md bg-primary text-primary-foreground"><GraduationCap className="size-4" /></span>
               <span className="hidden sm:inline">Interview Prep</span>
             </a>
             <button
