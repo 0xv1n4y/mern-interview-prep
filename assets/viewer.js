@@ -10,6 +10,10 @@
 // [group, [[file, label, icon, ready], ...]]: set ready to true when a document is added.
 const GROUPS = [
   ["Start here", [["index.html", "Your interview plan", "🎯", true]]],
+  ["★ Most-asked (simple)", [
+    ["m1-javascript.html", "JavaScript", "🟨", true], ["m2-react.html", "React", "⚛️", true],
+    ["m3-node-express.html", "Node & Express", "🟩", true], ["m4-mongodb.html", "MongoDB", "🍃", true],
+    ["m5-sql-postgresql.html", "SQL & PostgreSQL", "🐘", true], ["m6-git-docker-gcp.html", "Git, Docker & GCP", "🐳", true]]],
   ["Languages", [["01-javascript.html", "JavaScript", "🟨", true], ["01b-typescript.html", "TypeScript ⭐", "🔷", true]]],
   ["Frontend & backend", [["02-react.html", "React", "⚛️", true], ["03-node-express.html", "Node & Express", "🟩", true], ["06-backend-essentials.html", "Backend essentials", "🧱", false]]],
   ["Databases", [["04-mongodb.html", "MongoDB", "🍃", true], ["05-postgresql.html", "PostgreSQL", "🐘", true]]],
@@ -53,25 +57,218 @@ function preprocess(md, practices) {
 function buildCards(root, docId) {
   const level = { basic: ["basic", "🟢 Basic"], mid: ["mid", "🟡 Intermediate"], adv: ["adv", "🔴 Advanced"] };
   [...root.querySelectorAll("h3")].forEach((h3) => {
-    let text = h3.innerHTML, diff = null;
+    let text = h3.innerHTML, diff = null, star = false;
+    const s = text.match(/\s*\{star\}\s*$/);
+    if (s) { star = true; text = text.replace(s[0], ""); }
     const m = text.match(/\s*\{(basic|mid|adv)\}\s*$/);
     if (m) { diff = m[1]; text = text.replace(m[0], ""); }
     const id = slug(text);
     const card = document.createElement("details");
-    card.className = "q"; card.id = id; card.dataset.diff = diff || "";
+    card.className = "q" + (star ? " star" : ""); card.id = id; card.dataset.diff = diff || "";
     const key = `ip:${docId}:${id}`;
     const tag = diff ? `<span class="tag ${level[diff][0]}">${level[diff][1]}</span>` : "";
-    card.innerHTML = `<summary><span class="title">${text}</span>${tag}<label class="done-box"><input type="checkbox"> Done</label></summary><div class="body"></div>`;
+    const starTag = star ? `<span class="tag must">★ Must-ask</span>` : "";
+    card.innerHTML = `<summary><span class="title">${text}</span>${starTag}${tag}<label class="done-box"><input type="checkbox"> Done</label></summary><div class="body"></div>`;
     const body = card.querySelector(".body");
     let n = h3.nextSibling;
     while (n && !(n.nodeType === 1 && /^H[123]$/.test(n.tagName))) { const next = n.nextSibling; body.appendChild(n); n = next; }
     h3.replaceWith(card);
+    if (AI_PAGES.test(docId)) buildAiPanel(card, body, text, docId, id);
     const box = card.querySelector(".done-box input");
     box.checked = store.get(key) === "1";
     card.classList.toggle("is-done", box.checked);
     card.querySelector(".done-box").addEventListener("click", (e) => e.stopPropagation());
     box.addEventListener("change", () => { store.set(key, box.checked ? "1" : "0"); card.classList.toggle("is-done", box.checked); updateProgress(); });
   });
+}
+
+// --- 2b. AI practice (Gemini through our own backend at /api/ai) ---
+// Every question card gets: answer by typing or mic (English / Telugu) → AI feedback, and "Ask a doubt".
+const AI_PAGES = /.*/;                       // question pages that get the AI panel
+const AI = {
+  base() { return (store.get("ip:aiBase") || "").replace(/\/$/, ""); },   // "" = same site
+  pass() { return store.get("ip:aiPass") || ""; },
+};
+let purifyReady = null;
+async function safeHtml(markdown) {
+  purifyReady ??= loadScript("https://cdn.jsdelivr.net/npm/dompurify@3.1.6/dist/purify.min.js");
+  await purifyReady;
+  return DOMPurify.sanitize(marked.parse(markdown));
+}
+
+async function callAi(payload) {
+  if (!AI.pass()) { openAiSettings("Enter your passcode first."); throw new Error("Passcode needed: open 🤖 AI settings."); }
+  let res;
+  try {
+    res = await fetch(AI.base() + "/api/ai", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "x-app-passcode": AI.pass() },
+      body: JSON.stringify(payload),
+    });
+  } catch {
+    throw new Error("Can't reach the AI server. Check your internet, or the server address in 🤖 AI settings.");
+  }
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.error || `AI server error (${res.status})`);
+  return data.text;
+}
+
+let activeMic = null;   // only one microphone session at a time
+function startMic(btn, langSel, ta, status) {
+  const Rec = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (!Rec) { status.textContent = "🎙 Voice input works in Chrome or Edge. In this browser, please type your answer."; return; }
+  if (activeMic) { activeMic.stop(); return; }
+  const rec = new Rec();
+  rec.lang = langSel.value; rec.continuous = true; rec.interimResults = true;
+  const before = ta.value ? ta.value.replace(/\s*$/, " ") : "";
+  let finalText = "";
+  rec.onresult = (e) => {
+    let interim = "";
+    for (let i = e.resultIndex; i < e.results.length; i++) {
+      const t = e.results[i][0].transcript;
+      if (e.results[i].isFinal) finalText += t + " "; else interim += t;
+    }
+    ta.value = before + finalText;
+    status.textContent = interim ? "🎙 …" + interim : "🎙 Listening… click Stop when you finish.";
+  };
+  rec.onerror = (e) => { status.textContent = e.error === "not-allowed" ? "🎙 Microphone blocked. Allow mic access in the browser address bar." : "🎙 Mic error: " + e.error; };
+  rec.onend = () => { activeMic = null; btn.classList.remove("rec"); btn.textContent = "🎙 Speak"; if (status.textContent.startsWith("🎙 Listening") || status.textContent.startsWith("🎙 …")) status.textContent = "Done. Edit the text if needed, then press Send."; };
+  rec.start(); activeMic = rec;
+  btn.classList.add("rec"); btn.textContent = "⏹ Stop";
+  status.textContent = "🎙 Listening… click Stop when you finish.";
+}
+
+function buildAiPanel(card, body, titleHtml, docId, qid) {
+  const question = titleHtml.replace(/<[^>]+>/g, "").replace(/&amp;/g, "&").replace(/&lt;/g, "<").trim();
+  const histKey = `ip:ai:${docId}:${qid}`;
+  const wrap = document.createElement("div");
+  wrap.className = "ai";
+  wrap.innerHTML = `
+    <button class="ai-open" type="button">🤖 Practice with AI <span>answer by typing or speaking, or ask a doubt</span></button>
+    <div class="ai-panel hidden">
+      <div class="ai-tabs" role="tablist">
+        <button type="button" class="on" data-m="evaluate">🎤 Answer like an interview</button>
+        <button type="button" data-m="doubt">❓ Ask a doubt</button>
+      </div>
+      <label class="ai-hide"><input type="checkbox" checked> Hide the answer below while I practise</label>
+      <textarea rows="5" placeholder="Type your answer here, or press 🎙 Speak and answer out loud (English or Telugu)…"></textarea>
+      <div class="ai-row">
+        <button type="button" class="btn ghost mic">🎙 Speak</button>
+        <select class="mic-lang" aria-label="Speaking language"><option value="en-IN">English</option><option value="te-IN">తెలుగు (Telugu)</option></select>
+        <span class="grow"></span>
+        <button type="button" class="btn ghost clear">Clear</button>
+        <button type="button" class="btn run send">Send ➤</button>
+      </div>
+      <p class="ai-status" aria-live="polite"></p>
+      <div class="ai-out"></div>
+      <details class="ai-history hidden"><summary>Previous attempts</summary><div></div></details>
+    </div>`;
+  body.prepend(wrap);
+  const $ = (s) => wrap.querySelector(s);
+  const panel = $(".ai-panel"), ta = $("textarea"), status = $(".ai-status"), out = $(".ai-out"), hide = $(".ai-hide input");
+  let mode = "evaluate";
+  const chat = [];   // doubt conversation for this question
+
+  const setHidden = () => card.classList.toggle("quiz", mode === "evaluate" && !panel.classList.contains("hidden") && hide.checked);
+  $(".ai-open").onclick = () => { panel.classList.toggle("hidden"); setHidden(); if (!panel.classList.contains("hidden")) ta.focus(); };
+  hide.onchange = setHidden;
+  wrap.querySelectorAll(".ai-tabs button").forEach((b) => b.onclick = () => {
+    wrap.querySelectorAll(".ai-tabs button").forEach((x) => x.classList.toggle("on", x === b));
+    mode = b.dataset.m;
+    $(".ai-hide").classList.toggle("hidden", mode !== "evaluate");
+    ta.placeholder = mode === "evaluate"
+      ? "Type your answer here, or press 🎙 Speak and answer out loud (English or Telugu)…"
+      : "What is your doubt about this question? (English or Telugu)";
+    out.innerHTML = ""; status.textContent = ""; setHidden();
+    if (mode === "doubt") renderChat();
+  });
+  $(".mic").onclick = () => startMic($(".mic"), $(".mic-lang"), ta, status);
+  $(".clear").onclick = () => { ta.value = ""; out.innerHTML = ""; status.textContent = ""; if (mode === "doubt") { chat.length = 0; } };
+
+  const reference = () => [...body.children].filter((el) => el !== wrap).map((el) => el.textContent).join("\n").replace(/\n{3,}/g, "\n\n").slice(0, 7000);
+
+  async function renderChat() {
+    const parts = await Promise.all(chat.map(async (m) => m.role === "user"
+      ? `<div class="msg me">${esc(m.text)}</div>` : `<div class="msg ai-msg">${await safeHtml(m.text)}</div>`));
+    out.innerHTML = parts.join("");
+  }
+
+  function showHistory() {
+    let list = []; try { list = JSON.parse(store.get(histKey) || "[]"); } catch {}
+    const h = $(".ai-history");
+    h.classList.toggle("hidden", !list.length);
+    h.querySelector("summary").textContent = `Previous attempts (${list.length})`;
+    h.querySelector("div").innerHTML = list.map((a) => `<div class="attempt"><small>${esc(a.when)}${a.score ? " · " + esc(a.score) : ""}</small><p>${esc(a.answer)}</p></div>`).join("");
+  }
+  showHistory();
+
+  $(".send").onclick = async () => {
+    const text = ta.value.trim();
+    if (!text) { status.textContent = mode === "evaluate" ? "Type or speak your answer first." : "Type your doubt first."; return; }
+    if (activeMic) activeMic.stop();
+    const btn = $(".send"); btn.disabled = true;
+    status.textContent = mode === "evaluate" ? "🤖 Checking your answer…" : "🤖 Thinking…";
+    try {
+      if (mode === "evaluate") {
+        const reply = await callAi({ mode: "evaluate", question, reference: reference(), text, page: document.title });
+        out.innerHTML = await safeHtml(reply);
+        status.textContent = "Here's your feedback. Try again to improve your score!";
+        const score = (reply.match(/(\d{1,2})\s*\/\s*10/) || [])[0] || "";
+        let list = []; try { list = JSON.parse(store.get(histKey) || "[]"); } catch {}
+        list.unshift({ when: new Date().toLocaleString(), score, answer: text.slice(0, 600) });
+        store.set(histKey, JSON.stringify(list.slice(0, 5)));
+        showHistory();
+      } else {
+        chat.push({ role: "user", text });
+        ta.value = "";
+        await renderChat();
+        const reply = await callAi({ mode: "doubt", question, reference: reference(), text, history: chat.slice(-7, -1), page: document.title });
+        chat.push({ role: "model", text: reply });
+        await renderChat();
+        status.textContent = "Ask a follow-up question if anything is still unclear.";
+      }
+    } catch (err) {
+      if (mode === "doubt") chat.pop();
+      status.textContent = "⚠ " + err.message;
+    } finally { btn.disabled = false; }
+  };
+}
+
+function openAiSettings(message = "") {
+  let dlg = document.getElementById("ai-settings");
+  if (!dlg) {
+    document.body.insertAdjacentHTML("beforeend", `
+      <dialog id="ai-settings" class="ai-dialog">
+        <form method="dialog">
+          <h3>🤖 AI practice settings</h3>
+          <p class="note-msg"></p>
+          <label>Passcode<input name="pass" type="password" autocomplete="current-password" placeholder="The passcode you set on the server"></label>
+          <label>Server address <small>(leave empty when the site and the AI server are on the same website)</small><input name="base" type="url" placeholder="https://your-site.vercel.app"></label>
+          <p class="test-msg" aria-live="polite"></p>
+          <div class="ai-row"><button type="button" class="btn ghost test">Test connection</button><span class="grow"></span><button value="cancel" class="btn ghost">Close</button><button value="save" class="btn run">Save</button></div>
+          <small class="fine">Saved only in this browser. Your Gemini API key stays on the server and is never sent to this page.</small>
+        </form>
+      </dialog>`);
+    dlg = document.getElementById("ai-settings");
+    const f = dlg.querySelector("form");
+    dlg.addEventListener("close", () => {
+      if (dlg.returnValue === "save") { store.set("ip:aiPass", f.pass.value.trim()); store.set("ip:aiBase", f.base.value.trim()); }
+    });
+    dlg.querySelector(".test").onclick = async () => {
+      const msg = dlg.querySelector(".test-msg");
+      msg.textContent = "Testing…";
+      try {
+        const res = await fetch(f.base.value.trim().replace(/\/$/, "") + "/api/ai", { method: "POST", headers: { "Content-Type": "application/json", "x-app-passcode": f.pass.value.trim() }, body: JSON.stringify({ mode: "ping" }) });
+        const data = await res.json().catch(() => ({}));
+        msg.textContent = res.ok ? "✅ Connected. " + (data.text || "") : "❌ " + (data.error || res.status);
+      } catch { msg.textContent = "❌ Can't reach the server at that address."; }
+    };
+  }
+  const f = dlg.querySelector("form");
+  f.pass.value = AI.pass(); f.base.value = AI.base();
+  dlg.querySelector(".note-msg").textContent = message;
+  dlg.querySelector(".test-msg").textContent = "";
+  dlg.showModal();
 }
 
 // --- 3. Practice editors: run code + tests in a worker with a time limit ---
@@ -151,14 +348,17 @@ function buildFilters(content, search) {
   const anchor = h1?.nextElementSibling?.classList.contains("lead") ? h1.nextElementSibling : h1;
   const bar = document.createElement("div");
   bar.className = "filters";
-  bar.innerHTML = `<button class="chip on" data-f="all">All</button><button class="chip" data-f="basic">🟢 Basic</button><button class="chip" data-f="mid">🟡 Intermediate</button><button class="chip" data-f="adv">🔴 Advanced</button><button class="chip" data-f="todo">Not done</button>`;
+  const hasStars = !!content.querySelector("details.q.star");
+  bar.innerHTML = `<button class="chip on" data-f="all">All</button>${hasStars ? '<button class="chip must" data-f="star">★ Must-ask only</button>' : ""}<button class="chip" data-f="basic">🟢 Basic</button><button class="chip" data-f="mid">🟡 Intermediate</button><button class="chip" data-f="adv">🔴 Advanced</button><button class="chip" data-f="todo">Not done</button>`;
   anchor.after(bar);
   let filter = "all";
   const apply = () => {
     const q = search.value.trim().toLowerCase();
     content.querySelectorAll("details.q").forEach((c) => {
       const okText = !q || c.textContent.toLowerCase().includes(q);
-      const okFilter = filter === "all" || (filter === "todo" ? !c.classList.contains("is-done") : c.dataset.diff === filter);
+      const okFilter = filter === "all"
+        || (filter === "todo" ? !c.classList.contains("is-done")
+          : filter === "star" ? c.classList.contains("star") : c.dataset.diff === filter);
       c.classList.toggle("hidden", !(okText && okFilter));
       if (q && okText) c.open = true;
     });
@@ -200,7 +400,7 @@ function buildOnPage(col, content) {
 
 // --- 5. Page shell ---
 async function main() {
-  document.documentElement.dataset.theme = store.get("ip:theme") || "dark";
+  document.documentElement.dataset.theme = store.get("ip:theme") || (matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark");
   const fonts = document.createElement("link");
   fonts.rel = "stylesheet";
   fonts.href = "https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap";
@@ -229,6 +429,7 @@ async function main() {
         <label class="search"><span>🔍</span><input type="search" placeholder="Search questions…" aria-label="Search questions on this page"><kbd>Ctrl K</kbd></label>
         <div class="actions">
           <button class="icon-btn" id="expand" title="Open or close all answers">⇕ All</button>
+          <button class="icon-btn" id="ai-btn" title="AI practice settings">🤖 AI</button>
           <button class="icon-btn" id="theme" title="Switch light / dark">🌓</button>
           <a class="cta" href="index.html#now-full-stack-developer-kochi">Kochi plan ›</a>
         </div>
@@ -242,6 +443,7 @@ async function main() {
     if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "k") { e.preventDefault(); search.focus(); search.select(); }
   });
   document.getElementById("menu").onclick = () => document.body.classList.toggle("nav-open");
+  document.getElementById("ai-btn").onclick = () => openAiSettings();
   document.addEventListener("click", (e) => {   // close the mobile menu on a link tap or a tap outside it
     if (!document.body.classList.contains("nav-open") || e.target.closest("#menu")) return;
     if (e.target.closest("a") || !e.target.closest(".sidebar")) document.body.classList.remove("nav-open");

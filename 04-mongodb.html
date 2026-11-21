@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>MongoDB · MERN Interview Prep</title>
-<link rel="stylesheet" href="assets/style.css?v=8">
+<link rel="stylesheet" href="assets/style.css?v=9">
 </head>
 <body>
 <script type="text/markdown" id="doc">
@@ -566,6 +566,6 @@ function nextPage(items, afterId, limit) {
 **Explain it:** in MongoDB this is `find({ _id: { $gt: cursor } }).sort({ _id: 1 }).limit(limit + 1)`. It uses the `_id` index and stays fast on page 1 or page 10,000. The "fetch one extra" trick tells you whether there's a next page without a count query.
 :::
 </script>
-<script src="assets/viewer.js?v=8"></script>
+<script src="assets/viewer.js?v=9"></script>
 </body>
 </html>
