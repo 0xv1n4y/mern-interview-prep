@@ -38,7 +38,7 @@ export function QuestionItem({ q, n, pageId, pageTitle }: { q: Question; n: numb
   const level = LEVEL[q.level]
 
   return (
-    <AccordionItem value={q.id} id={q.id} className={cn('scroll-mt-24 rounded-xl border bg-card px-0 shadow-xs transition-colors last:border-b', done && 'bg-muted/30')}>
+    <AccordionItem value={q.id} id={q.id} className={cn('scroll-mt-24 rounded-xl border border-border/70 bg-card px-0 transition-colors last:border-b', done && 'bg-muted/30')}>
       <AccordionTrigger className="items-center gap-3 px-4 py-3.5 hover:no-underline sm:px-5">
         <span className="flex min-w-0 flex-1 items-start gap-3 text-left">
           <span className={cn('mt-0.5 flex size-6 shrink-0 items-center justify-center rounded-md border text-xs font-medium tabular-nums text-muted-foreground', done && 'border-emerald-500/40 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400')}>
@@ -77,7 +77,7 @@ export function QuestionItem({ q, n, pageId, pageTitle }: { q: Question; n: numb
           </TabsContent>
         </Tabs>
 
-        <div className="flex justify-end border-t pt-3">
+        <div className="flex justify-end border-t border-border/60 pt-3">
           <Button variant={done ? 'secondary' : 'outline'} size="sm" onClick={() => setDone(done ? '0' : '1')}>
             <Check /> {done ? 'Done' : 'Mark as done'}
           </Button>

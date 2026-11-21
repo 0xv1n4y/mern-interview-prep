@@ -53,7 +53,7 @@ export function TopicPage({ info, group, anchor }: { info: PageInfo; group: stri
       {intro && <Markdown md={intro} className="mt-3 text-[17px] text-muted-foreground" />}
 
       {hasQuestions && (
-        <div className="mt-6 rounded-xl border bg-card p-4">
+        <div className="mt-6 rounded-xl border border-border/70 bg-card p-4">
           <div className="flex flex-wrap items-center justify-between gap-2 text-sm">
             <span className="text-muted-foreground"><span className="font-medium text-foreground">{all.length}</span> questions{stars > 0 && <> · <Star className="inline size-3.5 -translate-y-px fill-amber-400 text-amber-400" /> <span className="font-medium text-foreground">{stars}</span> must-ask</>}</span>
             <span className="tabular-nums text-muted-foreground">{done}/{all.length} done</span>
@@ -63,7 +63,7 @@ export function TopicPage({ info, group, anchor }: { info: PageInfo; group: stri
       )}
 
       {hasQuestions && (
-        <div className="sticky top-14 z-10 -mx-4 mt-6 flex flex-wrap items-center gap-2 border-b bg-background/90 px-4 py-3 backdrop-blur sm:-mx-6 sm:px-6">
+        <div className="sticky top-14 z-10 -mx-4 mt-6 flex flex-wrap items-center gap-2 border-b border-border/60 bg-background/90 px-4 py-3 backdrop-blur sm:-mx-6 sm:px-6">
           <ToggleGroup type="single" value={filter} onValueChange={(v) => v && setFilter(v as typeof filter)} variant="outline" size="sm">
             <ToggleGroupItem value="all" className="px-3">All</ToggleGroupItem>
             {stars > 0 && <ToggleGroupItem value="star" className="px-3"><Star className="fill-amber-400 text-amber-400" /> Must-ask</ToggleGroupItem>}
@@ -91,11 +91,11 @@ export function TopicPage({ info, group, anchor }: { info: PageInfo; group: stri
           if (!s.questions.length) {
             // Reference sections (key terms, revision sheet) stay folded on question pages to keep things tidy.
             return hasQuestions ? (
-              <details key={s.id} id={s.id} className="group scroll-mt-28 rounded-xl border bg-card">
+              <details key={s.id} id={s.id} className="group scroll-mt-28 rounded-xl border border-border/70 bg-card">
                 <summary className="flex cursor-pointer list-none items-center justify-between px-5 py-4 font-medium">
                   {s.title}<ChevronDown className="size-4 text-muted-foreground transition-transform group-open:rotate-180" />
                 </summary>
-                <div className="space-y-4 border-t px-5 py-4"><Blocks blocks={s.intro} /></div>
+                <div className="space-y-4 border-t border-border/60 px-5 py-4"><Blocks blocks={s.intro} /></div>
               </details>
             ) : (
               <section key={s.id} id={s.id} className="scroll-mt-24 space-y-4">

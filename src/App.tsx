@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Menu, Moon, Search, Sun, Bot } from 'lucide-react'
+import { PanelLeftClose, PanelLeftOpen, Menu, Moon, Search, Sun, Bot } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Sheet, SheetContent, SheetTitle } from '@/components/ui/sheet'
 import { Kbd } from '@/components/ui/kbd'
@@ -28,6 +28,13 @@ export default function App() {
   const [dark, toggleTheme] = useTheme()
   const [menu, setMenu] = useState(false)
   const [search, setSearch] = useState(false)
+  // Desktop sidebar can be hidden for more reading space; the choice is remembered.
+  const [sidebar, setSidebar] = useState(() => store.get('ip:sidebar') !== 'closed')
+  const toggleSidebar = () => {
+    if (matchMedia('(min-width: 1024px)').matches) {
+      setSidebar((s) => { store.set('ip:sidebar', s ? 'closed' : 'open'); return !s })
+    } else setMenu(true)
+  }
 
   useEffect(() => {
     const on = (e: KeyboardEvent) => { if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') { e.preventDefault(); setSearch(true) } }
@@ -41,9 +48,17 @@ export default function App() {
   return (
     <TooltipProvider delayDuration={300}>
       <div className="min-h-dvh bg-background text-foreground">
-        <header className="sticky top-0 z-30 h-14 border-b bg-background/85 backdrop-blur">
+        <header className="sticky top-0 z-30 h-14 border-b border-border/60 bg-background/85 backdrop-blur">
           <div className="flex h-full items-center gap-2 px-3 sm:px-5">
-            <Button variant="ghost" size="icon" className="lg:hidden" onClick={() => setMenu(true)} aria-label="Open menu"><Menu /></Button>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button variant="ghost" size="icon" onClick={toggleSidebar} aria-label={sidebar ? 'Hide menu' : 'Show menu'} aria-expanded={sidebar}>
+                  <Menu className="lg:hidden" />
+                  {sidebar ? <PanelLeftClose className="hidden lg:block" /> : <PanelLeftOpen className="hidden lg:block" />}
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>{sidebar ? 'Hide menu' : 'Show menu'}</TooltipContent>
+            </Tooltip>
             <a href={href('index')} className="mr-2 flex items-center gap-2 font-semibold tracking-tight">
               <span className="flex size-7 items-center justify-center rounded-md bg-primary text-sm text-primary-foreground">IP</span>
               <span className="hidden sm:inline">Interview Prep</span>
@@ -66,8 +81,11 @@ export default function App() {
         </header>
 
         <div className="flex">
-          <aside className="sticky top-14 hidden h-[calc(100dvh-3.5rem)] w-64 shrink-0 overflow-y-auto border-r lg:block">
-            <Sidebar current={info.slug} />
+          <aside
+            aria-hidden={!sidebar}
+            className={`sticky top-14 hidden h-[calc(100dvh-3.5rem)] shrink-0 overflow-hidden transition-[width] duration-200 lg:block ${sidebar ? 'w-64 border-r border-border/60' : 'w-0'}`}
+          >
+            <div className="h-full w-64 overflow-y-auto"><Sidebar current={info.slug} /></div>
           </aside>
           <main className="min-w-0 flex-1">
             <TopicPage key={info.slug} info={info} group={info.group} anchor={route.page === info.slug ? route.anchor : ''} />
