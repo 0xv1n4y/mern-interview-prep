@@ -36,7 +36,7 @@ SQL is like an Excel sheet: every row must have the same columns. MongoDB is lik
 - **MongoDB:** flexible schema, nested data, easy horizontal scaling, great with JavaScript (JSON).
 - **SQL:** fixed schema, strong relationships with joins, strict transactions; great for banking, orders, reports.
 
-```js
+```text
 // One MongoDB document
 {
   "_id": "665f1c...",
@@ -58,7 +58,7 @@ SQL is like an Excel sheet: every row must have the same columns. MongoDB is lik
 **Database** holds collections. **Collection** holds documents (like a table). **Document** is one record (like a row), stored as BSON.
 :::
 
-```js
+```text
 SQL:      Database → Table      → Row      → Column
 MongoDB:  Database → Collection → Document → Field
 ```

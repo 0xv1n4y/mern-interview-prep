@@ -9,6 +9,7 @@ export type ChatMsg = { role: 'user' | 'model'; text: string }
 export type AiRequest =
   | { mode: 'ping' }
   | { mode: 'transcribe'; audio: string; lang: 'en' | 'te' }
+  | { mode: 'review'; question: string; language: 'js' | 'sql'; code: string; output: string }
   | { mode: 'evaluate'; question: string; reference: string; text: string; page: string }
   | { mode: 'doubt'; question: string; reference: string; text: string; history: ChatMsg[]; page: string }
 

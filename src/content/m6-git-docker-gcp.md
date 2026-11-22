@@ -155,7 +155,7 @@ git reset --soft HEAD~1   # undo my last local commit, keep the changes
 A file listing what Git should **not** track: `node_modules`, `.env` (secrets), build folders, log files.
 :::
 
-```js
+```text
 node_modules/
 .env
 dist/
@@ -309,7 +309,7 @@ Only describe the GCP steps you actually did. For anything else, say "the approa
 Know these by name and what each one is for. That's usually enough for a full stack interview.
 :::
 
-```js
+```text
 Compute Engine   → virtual machines (full control of a server)
 Cloud Run        → run Docker containers without managing servers
 App Engine       → deploy code directly (platform manages everything)

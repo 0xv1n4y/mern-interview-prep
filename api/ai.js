@@ -70,6 +70,39 @@ Answer the doubt simply, like a patient teacher:
 Use Markdown. Keep it under 220 words.`;
 }
 
+function reviewPrompt({ question, language, code, output }) {
+  return `The candidate is practising this interview question: "${question}"
+
+Their ${language} code:
+\`\`\`
+${code}
+\`\`\`
+
+Result when they ran it:
+\`\`\`
+${output || '(not run yet)'}
+\`\`\`
+
+Review it like a kind senior developer in a coding interview. Reply in Markdown with these sections:
+
+### ✅ Does it work?
+One or two lines: correct / partly correct / not correct, and why. Mention edge cases it misses.
+
+### 🐞 Problems
+Bullet points (bugs, wrong output, bad practices). Say "None" if there are none.
+
+### 💡 Hint
+If it is not correct yet, give ONE hint that helps without giving the full answer.
+
+### ✨ Cleaner version
+A short improved version of their code in a code block (keep their approach if it is valid). Add time complexity for algorithm questions.
+
+### 🎤 How to explain it
+Two bullet points they can say out loud in the interview.
+
+Keep it under 280 words.`;
+}
+
 const clip = (s, n) => (typeof s === 'string' ? s.slice(0, n) : '');
 
 function passcodeOk(given) {
@@ -159,6 +192,13 @@ export default async function handler(req, res) {
   const mode = body.mode;
   if (mode === 'ping') return send(res, 200, { text: `AI server ready (model: ${MODEL()}).` });
   if (mode === 'transcribe') return transcribe(body, res);
+  if (mode === 'review') {
+    const code = clip(body.code, 8000);
+    if (!code.trim()) return send(res, 400, { error: 'Write some code first.' });
+    try {
+      return send(res, 200, { text: await askGemini([{ role: 'user', parts: [{ text: reviewPrompt({ question: clip(body.question, 400), language: body.language === 'sql' ? 'SQL (PostgreSQL)' : 'JavaScript', code, output: clip(body.output, 3000) }) }] }], { temperature: 0.3 }) });
+    } catch (err) { return send(res, err.status || 500, { error: err.message || 'Review failed.' }); }
+  }
   if (mode !== 'evaluate' && mode !== 'doubt') return send(res, 400, { error: 'Unknown mode.' });
 
   const input = { question: clip(body.question, 400), reference: clip(body.reference, 7000), text: clip(body.text, 4000) };

@@ -22,6 +22,24 @@ Good start; a few points are missing.
 ### 💡 One tip
 Keep it under 60 seconds.`
 
+const MOCK_REVIEW = `### ✅ Does it work?
+(mock) Mostly correct.
+
+### 🐞 Problems
+- None
+
+### 💡 Hint
+Think about empty input.
+
+### ✨ Cleaner version
+\`\`\`js
+const x = 1;
+\`\`\`
+
+### 🎤 How to explain it
+- Point one
+- Point two`
+
 export function aiDevApi(): Plugin {
   return {
     name: 'ai-dev-api',
@@ -37,6 +55,7 @@ export function aiDevApi(): Plugin {
           for await (const c of req) raw += c
           const body = JSON.parse(raw || '{}') as { mode?: string; text?: string }
           const text = body.mode === 'ping' ? 'Mock AI server ready (no Gemini calls).'
+            : body.mode === 'review' ? MOCK_REVIEW
             : body.mode === 'transcribe' ? '(mock transcript) A closure is a function that remembers the variables from where it was created.'
             : body.mode === 'evaluate' ? MOCK_EVAL(String(body.text || ''))
               : `(mock) A simple answer to: **"${String(body.text || '').slice(0, 60)}"**\n\n- One-line answer\n- Example: \`const x = 1;\``

@@ -9,4 +9,6 @@ export default defineConfig({
   plugins: [react(), tailwindcss(), aiDevApi()],
   resolve: { alias: { '@': path.resolve(__dirname, './src') } },
   server: { port: 5173 },
+  // PGlite ships its own WebAssembly files; Vite must not pre-bundle it.
+  optimizeDeps: { exclude: ['@electric-sql/pglite'] },
 })

@@ -819,6 +819,20 @@ const reverse = s => s.split('').reverse().join('');
 reverse('hello'); // 'olleh'
 ```
 
+:::practice
+```js starter
+function reverse(str) {
+  // Write your code here
+}
+```
+```js tests
+check(reverse('hello'), 'olleh', 'reverse("hello")');
+check(reverse('a'), 'a', 'single character');
+check(reverse(''), '', 'empty string');
+check(reverse('React JS'), 'SJ tcaeR', 'with a space');
+```
+:::
+
 ### Check if a string is a palindrome {basic}
 
 ```js
@@ -829,12 +843,40 @@ function isPalindrome(s) {
 isPalindrome('Madam'); // true
 ```
 
+:::practice
+```js starter
+function isPalindrome(str) {
+  // Ignore case, spaces and punctuation
+}
+```
+```js tests
+check(isPalindrome('Madam'), true, 'Madam');
+check(isPalindrome('racecar'), true, 'racecar');
+check(isPalindrome('hello'), false, 'hello');
+check(isPalindrome('A man, a plan, a canal: Panama'), true, 'sentence with punctuation');
+```
+:::
+
 ### Remove duplicates from an array {basic} {star}
 
 ```js
 const unique = arr => [...new Set(arr)];
 unique([1, 2, 2, 3]); // [1, 2, 3]
 ```
+
+:::practice
+```js starter
+function unique(arr) {
+  // Return a new array without duplicates (keep the first occurrence order)
+}
+```
+```js tests
+check(unique([1, 2, 2, 3]), [1, 2, 3], '[1, 2, 2, 3]');
+check(unique([]), [], 'empty array');
+check(unique(['a', 'b', 'a', 'c', 'b']), ['a', 'b', 'c'], 'strings');
+check(unique([5, 5, 5]), [5], 'all the same');
+```
+:::
 
 ### Flatten a nested array {mid}
 
@@ -846,6 +888,20 @@ function flatten(arr) {
 flatten([1, [2, [3, 4]], 5]); // [1, 2, 3, 4, 5]
 // Built-in: [1, [2, [3]]].flat(Infinity)
 ```
+
+:::practice
+```js starter
+function flatten(arr) {
+  // Do not use arr.flat()
+}
+```
+```js tests
+check(flatten([1, [2, [3, 4]], 5]), [1, 2, 3, 4, 5], 'nested twice');
+check(flatten([]), [], 'empty');
+check(flatten([[[[1]]], 2]), [1, 2], 'deeply nested');
+check(flatten([1, 2, 3]), [1, 2, 3], 'already flat');
+```
+:::
 
 ### Two Sum: find two numbers that add up to a target {mid}
 
@@ -864,6 +920,20 @@ function twoSum(nums, target) {
 }
 twoSum([2, 7, 11, 15], 9); // [0, 1]
 ```
+
+:::practice
+```js starter
+function twoSum(nums, target) {
+  // Return the indices [i, j] of the two numbers that add up to target
+}
+```
+```js tests
+check(twoSum([2, 7, 11, 15], 9), [0, 1], '[2,7,11,15], 9');
+check(twoSum([3, 2, 4], 6), [1, 2], '[3,2,4], 6');
+check(twoSum([3, 3], 6), [0, 1], 'same number twice');
+check(twoSum([-1, -2, -3, -4, -5], -8), [2, 4], 'negative numbers');
+```
+:::
 
 ## Quick revision sheet
 

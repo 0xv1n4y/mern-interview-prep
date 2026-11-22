@@ -226,7 +226,7 @@ A REST API uses **URLs for things (resources)** and **HTTP methods for actions**
 
 **REST endpoints**
 
-```js
+```text
 GET    /api/products        → list products        200
 GET    /api/products/5      → one product          200 / 404
 POST   /api/products        → create               201
@@ -245,7 +245,7 @@ DELETE /api/products/5      → delete               204
 Split code by responsibility: **routes** (URLs) → **controllers** (handle request/response) → **services** (business logic) → **models** (database). Keep config, middleware and utilities in their own folders.
 :::
 
-```js
+```text
 src/
   server.js            # starts the app
   app.js               # express setup + middleware + routes

@@ -1,11 +1,10 @@
-import { useState } from 'react'
+import { lazy, Suspense, useState } from 'react'
 import { Check, Star, BookOpenText, Mic2, Dumbbell, Eye } from 'lucide-react'
 import { AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Button } from '@/components/ui/button'
 import { Callout } from '@/components/Callout'
 import { Markdown } from '@/components/Markdown'
-import { CodePractice } from '@/components/CodePractice'
 import { AiCoach } from '@/components/AiCoach'
 import type { Block, Question } from '@/lib/parse'
 import { doneKey, useStored } from '@/lib/store'
@@ -17,11 +16,31 @@ const LEVEL: Record<string, { label: string; dot: string }> = {
   adv: { label: 'Advanced', dot: 'bg-rose-500' },
 }
 const INTERVIEW = new Set(['say', 'warn', 'tip', 'hint2', 'proj'])
+const Playground = lazy(() => import('@/components/Playground'))
 
-function BlockView({ b, qid, i }: { b: Block; qid: string; i: number }) {
+// Code that needs a server, a DOM, React or a database driver can't run in the browser sandbox.
+const NOT_RUNNABLE_JS = /\brequire\(|^\s*(import|export)\s|\bexpress\b|\bapp\.(get|post|put|patch|delete|use|listen)\b|mongoose|\bdb\.|\bpool\.|\bclient\.query|\bprocess\.|\bfs\.|\bdocument\.|\bwindow\.|localStorage|sessionStorage|\bres\.(json|status|send)|\breq\.|\buse(State|Effect|Ref|Memo|Callback|Context|Reducer)\b|\bReact\b|<\/?[A-Za-z][\w.]*(\s[^<>]*)?\/?>|\bfetch\(|\bawait\s+axios|\bredis\.|\bjwt\.|\bbcrypt\.|\bnew Worker\b|\b[A-Z]\w*\.(find|findOne|findById|create|aggregate|updateOne|updateMany|deleteOne|insertMany|countDocuments)\(|\.populate\(|^\s*(interface|type)\s+\w+/m
+
+function findRunnable(q: Question): { language: 'js' | 'sql'; code: string } | null {
+  const fences = q.blocks.flatMap((b) => (b.kind === 'md' ? [...b.md.matchAll(/```(\w*)\n([\s\S]*?)```/g)] : []))
+  const sql = fences.find((m) => m[1] === 'sql')
+  if (sql) return { language: 'sql', code: sql[2].trim() }
+  const js = fences.find((m) => (m[1] === 'js' || m[1] === 'javascript') && !NOT_RUNNABLE_JS.test(m[2]))
+  return js ? { language: 'js', code: js[2].trim() } : null
+}
+
+function BlockView({ b }: { b: Block }) {
   if (b.kind === 'md') return <Markdown md={b.md} />
   if (b.kind === 'box') return <Callout type={b.type} md={b.md} />
-  return <CodePractice id={`${qid}-${i}`} starter={b.starter} tests={b.tests} hints={b.hints} solution={b.solution} />
+  return null
+}
+
+function PlaygroundSlot(props: React.ComponentProps<typeof Playground>) {
+  return (
+    <Suspense fallback={<div className="h-48 animate-pulse rounded-lg bg-muted/50" />}>
+      <Playground {...props} />
+    </Suspense>
+  )
 }
 
 export function QuestionItem({ q, n, pageId, pageTitle }: { q: Question; n: number; pageId: string; pageTitle: string }) {
@@ -34,6 +53,8 @@ export function QuestionItem({ q, n, pageId, pageTitle }: { q: Question; n: numb
   const learn = q.blocks.filter((b) => b !== quick && !(b.kind === 'box' && INTERVIEW.has(b.type)) && b.kind !== 'practice')
   const interview = q.blocks.filter((b) => b.kind === 'box' && INTERVIEW.has(b.type))
   const practice = q.blocks.filter((b) => b.kind === 'practice')
+  const runnable = practice.length ? null : findRunnable(q)
+  const isOutputQ = /^output:/i.test(q.title)
   const hideQuick = tab === 'practice' && !peek
   const level = LEVEL[q.level]
 
@@ -64,15 +85,18 @@ export function QuestionItem({ q, n, pageId, pageTitle }: { q: Question; n: numb
             {interview.length > 0 && <TabsTrigger value="interview"><Mic2 /> Interview</TabsTrigger>}
             <TabsTrigger value="practice"><Dumbbell /> Practice</TabsTrigger>
           </TabsList>
-          {learn.length > 0 && <TabsContent value="learn" className="mt-4 space-y-4">{learn.map((b, i) => <BlockView key={i} b={b} qid={q.id} i={i} />)}</TabsContent>}
-          {interview.length > 0 && <TabsContent value="interview" className="mt-4 space-y-4">{interview.map((b, i) => <BlockView key={i} b={b} qid={q.id} i={i} />)}</TabsContent>}
+          {learn.length > 0 && <TabsContent value="learn" className="mt-4 space-y-4">{learn.map((b, i) => <BlockView key={i} b={b} />)}</TabsContent>}
+          {interview.length > 0 && <TabsContent value="interview" className="mt-4 space-y-4">{interview.map((b, i) => <BlockView key={i} b={b} />)}</TabsContent>}
           <TabsContent value="practice" className="mt-4 space-y-6">
-            {practice.map((b, i) => (
-              <div key={i}>
-                <p className="mb-2 text-sm font-medium">Coding exercise</p>
-                <BlockView b={b} qid={q.id} i={i} />
-              </div>
+            {practice.map((b, i) => b.kind === 'practice' && (
+              <PlaygroundSlot key={i} id={`${pageId}:${q.id}:${i}`} language="js" starter={b.starter} tests={b.tests} hints={b.hints} solution={b.solution} question={q.title} />
             ))}
+            {runnable && (
+              <PlaygroundSlot
+                id={`${pageId}:${q.id}:try`} language={runnable.language} starter={runnable.code} question={q.title}
+                intro={isOutputQ ? 'Predict the output in your head first, then press Run to check.' : runnable.language === 'sql' ? 'Run the example, then change it and try your own queries on the sample tables.' : 'Run the example, then change it to see what happens.'}
+              />
+            )}
             <AiCoach pageId={pageId} qid={q.id} question={q.title.replace(/`/g, '')} reference={q.text.slice(0, 7000)} pageTitle={pageTitle} />
           </TabsContent>
         </Tabs>
