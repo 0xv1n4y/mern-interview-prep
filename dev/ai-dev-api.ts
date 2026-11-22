@@ -37,6 +37,7 @@ export function aiDevApi(): Plugin {
           for await (const c of req) raw += c
           const body = JSON.parse(raw || '{}') as { mode?: string; text?: string }
           const text = body.mode === 'ping' ? 'Mock AI server ready (no Gemini calls).'
+            : body.mode === 'transcribe' ? '(mock transcript) A closure is a function that remembers the variables from where it was created.'
             : body.mode === 'evaluate' ? MOCK_EVAL(String(body.text || ''))
               : `(mock) A simple answer to: **"${String(body.text || '').slice(0, 60)}"**\n\n- One-line answer\n- Example: \`const x = 1;\``
           res.setHeader('Content-Type', 'application/json')

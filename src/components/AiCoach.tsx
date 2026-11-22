@@ -1,11 +1,12 @@
 import { useEffect, useRef, useState } from 'react'
-import { Mic, Square, Send, Trash2, Bot, History, MessageCircleQuestion, GraduationCap } from 'lucide-react'
+import { Mic, Square, Send, Trash2, Bot, History, MessageCircleQuestion, GraduationCap, Loader2, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
 import { Markdown } from '@/components/Markdown'
-import { callAi, createRecognizer, type ChatMsg } from '@/lib/ai'
+import { callAi, type ChatMsg } from '@/lib/ai'
+import { MAX_SECONDS, startRecording, type Recording } from '@/lib/audio'
 import { store } from '@/lib/store'
 
 type Attempt = { when: string; score: string; answer: string }
@@ -14,42 +15,60 @@ export function AiCoach({ pageId, qid, question, reference, pageTitle }: { pageI
   const histKey = `ip:ai:${pageId}:${qid}`
   const [mode, setMode] = useState<'evaluate' | 'doubt'>('evaluate')
   const [text, setText] = useState('')
-  const [lang, setLang] = useState('en-IN')
-  const [listening, setListening] = useState(false)
-  const [interim, setInterim] = useState('')
+  const [lang, setLang] = useState<'en' | 'te'>('en')
+  const [mic, setMic] = useState<'idle' | 'recording' | 'transcribing'>('idle')
+  const [seconds, setSeconds] = useState(0)
+  const [level, setLevel] = useState(0)
   const [status, setStatus] = useState('')
   const [busy, setBusy] = useState(false)
   const [feedback, setFeedback] = useState('')
   const [chat, setChat] = useState<ChatMsg[]>([])
   const [history, setHistory] = useState<Attempt[]>(() => store.json(histKey, [] as Attempt[]))
-  const recRef = useRef<ReturnType<typeof createRecognizer>>(null)
+  const recRef = useRef<Recording | null>(null)
+  const timerRef = useRef<number>(0)
 
-  useEffect(() => () => recRef.current?.stop(), [])
+  useEffect(() => () => { recRef.current?.cancel(); clearInterval(timerRef.current) }, [])
 
-  const toggleMic = () => {
-    if (recRef.current) { recRef.current.stop(); return }
-    const rec = createRecognizer()
-    if (!rec) { setStatus('Voice input works in Chrome or Edge. In this browser, please type your answer.'); return }
-    rec.lang = lang; rec.continuous = true; rec.interimResults = true
-    const before = text ? text.replace(/\s*$/, ' ') : ''
-    let finalText = ''
-    rec.onresult = (e) => {
-      let live = ''
-      for (let i = e.resultIndex; i < e.results.length; i++) {
-        const t = e.results[i][0].transcript
-        if (e.results[i].isFinal) finalText += t + ' '; else live += t
-      }
-      setText(before + finalText); setInterim(live)
-    }
-    rec.onerror = (e) => setStatus(e.error === 'not-allowed' ? 'Microphone is blocked. Allow mic access from the address bar.' : 'Mic error: ' + e.error)
-    rec.onend = () => { recRef.current = null; setListening(false); setInterim(''); setStatus((s) => (s.startsWith('Listening') ? 'Done. Edit the text if needed, then press Send.' : s)) }
-    rec.start(); recRef.current = rec; setListening(true); setStatus('Listening… press Stop when you finish.')
+  // Record → Stop → Gemini transcribes (works in every browser, good with Telugu + English).
+  const stopMic = async () => {
+    const rec = recRef.current
+    if (!rec) return
+    recRef.current = null
+    clearInterval(timerRef.current)
+    setMic('transcribing'); setLevel(0); setStatus('Turning your speech into text…')
+    try {
+      const { base64, seconds: secs } = await rec.stop()
+      if (secs < 1) { setStatus('That was too short. Press Speak and talk for a few seconds.'); return }
+      const spoken = (await callAi({ mode: 'transcribe', audio: base64, lang })).trim()
+      setText((t) => (t.trim() ? t.replace(/\s*$/, ' ') : '') + spoken)
+      setStatus('Done. Check the text, edit if needed, then press Send.')
+    } catch (err) {
+      setStatus((err as Error).message)
+    } finally { setMic('idle') }
   }
+
+  const startMic = async () => {
+    setStatus('')
+    try {
+      recRef.current = await startRecording(setLevel)
+    } catch (err) { setStatus((err as Error).message); return }
+    setMic('recording'); setSeconds(0)
+    setStatus('Recording… speak your answer, then press Stop.')
+    const t0 = Date.now()
+    timerRef.current = window.setInterval(() => {
+      const s = Math.floor((Date.now() - t0) / 1000)
+      setSeconds(s)
+      if (s >= MAX_SECONDS) stopMic()   // auto-stop at the limit
+    }, 250)
+  }
+
+  const cancelMic = () => { recRef.current?.cancel(); recRef.current = null; clearInterval(timerRef.current); setMic('idle'); setLevel(0); setStatus('Recording discarded.') }
+  const clock = (n: number) => `${Math.floor(n / 60)}:${String(n % 60).padStart(2, '0')}`
 
   const send = async () => {
     const t = text.trim()
     if (!t) { setStatus(mode === 'evaluate' ? 'Type or speak your answer first.' : 'Type your doubt first.'); return }
-    recRef.current?.stop()
+    if (mic !== 'idle') { setStatus('Stop the recording first.'); return }
     setBusy(true); setStatus(mode === 'evaluate' ? 'Checking your answer…' : 'Thinking…')
     try {
       if (mode === 'evaluate') {
@@ -89,23 +108,34 @@ export function AiCoach({ pageId, qid, question, reference, pageTitle }: { pageI
 
       <div className="space-y-2">
         <Textarea
-          value={text + (interim ? ' ' + interim : '')}
+          value={text}
           onChange={(e) => setText(e.target.value)}
           rows={4}
           placeholder={mode === 'evaluate'
             ? 'Type your answer, or press Speak and answer out loud (English or Telugu)…'
             : 'What is your doubt about this question? (English or Telugu)'}
           className="min-h-28 text-[15px] leading-relaxed"
+          disabled={mic === 'transcribing'}
         />
         <div className="flex flex-wrap items-center gap-2">
-          <Button variant={listening ? 'destructive' : 'outline'} size="sm" onClick={toggleMic}>
-            {listening ? <><Square /> Stop</> : <><Mic /> Speak</>}
-          </Button>
-          <Select value={lang} onValueChange={setLang} disabled={listening}>
+          {mic === 'idle' && <Button variant="outline" size="sm" onClick={startMic}><Mic /> Speak</Button>}
+          {mic === 'recording' && (
+            <>
+              <Button variant="destructive" size="sm" onClick={stopMic}><Square /> Stop</Button>
+              <Button variant="ghost" size="icon-sm" onClick={cancelMic} aria-label="Discard recording"><X /></Button>
+              <span className="flex items-center gap-2 text-sm tabular-nums text-muted-foreground">
+                <span className="relative flex size-2.5"><span className="absolute inline-flex size-full animate-ping rounded-full bg-rose-500 opacity-60" /><span className="relative inline-flex size-2.5 rounded-full bg-rose-500" /></span>
+                {clock(seconds)} / {clock(MAX_SECONDS)}
+                <span className="h-1.5 w-16 overflow-hidden rounded-full bg-muted"><span className="block h-full rounded-full bg-emerald-500 transition-[width] duration-75" style={{ width: `${Math.round(level * 100)}%` }} /></span>
+              </span>
+            </>
+          )}
+          {mic === 'transcribing' && <Button variant="outline" size="sm" disabled><Loader2 className="animate-spin" /> Transcribing…</Button>}
+          <Select value={lang} onValueChange={(v) => setLang(v as 'en' | 'te')} disabled={mic !== 'idle'}>
             <SelectTrigger size="sm" className="w-32" aria-label="Speaking language"><SelectValue /></SelectTrigger>
             <SelectContent>
-              <SelectItem value="en-IN">English</SelectItem>
-              <SelectItem value="te-IN">తెలుగు Telugu</SelectItem>
+              <SelectItem value="en">English</SelectItem>
+              <SelectItem value="te">తెలుగు Telugu</SelectItem>
             </SelectContent>
           </Select>
           <div className="flex-1" />

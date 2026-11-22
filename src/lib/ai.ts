@@ -8,6 +8,7 @@ export const openAiSettings = (message = '') => window.dispatchEvent(new CustomE
 export type ChatMsg = { role: 'user' | 'model'; text: string }
 export type AiRequest =
   | { mode: 'ping' }
+  | { mode: 'transcribe'; audio: string; lang: 'en' | 'te' }
   | { mode: 'evaluate'; question: string; reference: string; text: string; page: string }
   | { mode: 'doubt'; question: string; reference: string; text: string; history: ChatMsg[]; page: string }
 
@@ -26,14 +27,4 @@ export async function callAi(payload: AiRequest, base = aiBase(), pass = aiPass(
   const data = (await res.json().catch(() => ({}))) as { text?: string; error?: string }
   if (!res.ok) throw new Error(data.error || `AI server error (${res.status})`)
   return data.text || ''
-}
-
-// Browser speech-to-text (Chrome / Edge). Typed loosely because the API isn't in the TS DOM lib.
-type SpeechRec = { lang: string; continuous: boolean; interimResults: boolean; start(): void; stop(): void
-  onresult: ((e: { resultIndex: number; results: ArrayLike<ArrayLike<{ transcript: string }> & { isFinal: boolean }> }) => void) | null
-  onerror: ((e: { error: string }) => void) | null; onend: (() => void) | null }
-export function createRecognizer(): SpeechRec | null {
-  const w = window as unknown as { SpeechRecognition?: new () => SpeechRec; webkitSpeechRecognition?: new () => SpeechRec }
-  const Rec = w.SpeechRecognition || w.webkitSpeechRecognition
-  return Rec ? new Rec() : null
 }
